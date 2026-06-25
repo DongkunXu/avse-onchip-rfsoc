@@ -10,5 +10,6 @@ Set ``config.data.root_dir = "D:/DataSet/LRS3"``.
 
 from .dataset import AVSEDataset
 from .data_module import AVSEDataModule
+from .stream_dataset import AVSESceneStreamDataset
 
-__all__ = ["AVSEDataset", "AVSEDataModule"]
+__all__ = ["AVSEDataset", "AVSEDataModule", "AVSESceneStreamDataset"]

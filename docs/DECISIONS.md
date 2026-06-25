@@ -84,6 +84,22 @@ asteroid/torch_pesq internals or doing an expensive per-window energy scan of th
 window list is cached to `.dataset_cache/<split>_<window-params>.json` so reruns/`--resume` start in
 ~0.2 s. Keyed by split + window params so it self-invalidates on a config change; git-ignored.
 
+### D-14 ✅ Scene-streaming dataset (read each scene once/epoch), not per-window random access
+**2026-06-25 — owner directed ("each scene should be read once; fix the core/structure, no patches").**
+The map-style `AVSEDataset` opens a window's 3 files per `__getitem__`; with global shuffle over ~315k
+windows / ~34.5k scenes (~9 windows/scene), every scene's files were re-opened ~9×/epoch and re-resampled,
+pegging the dataset SSD (random small reads, ~40 MB/s, GPU starved 51% of the time). Pre-packing a
+sequential copy was ruled out by disk facts (train = 260 GB; D: free = 70 GB). Chosen fix is structural,
+not a cache patch: a new `AVSESceneStreamDataset(IterableDataset)` whose unit of work is a **scene** — each
+worker reads a disjoint scene shard, opens each scene's files **once/epoch**, reads them whole+sequentially,
+resamples once, and slices all its windows from RAM. Shuffling is preserved by a bounded sliding scene pool
+(≈128 scenes resident/worker). Per-window decode + normalization are byte-identical to the old path, so
+training numerics are unchanged. Verified A/B: GPU util 46%→74% (steady 80–100%), SSD disktime 437%→26%.
+Old `AVSEDataset` kept for `verify_data.py`/val; `data_module.py` (Lightning, unused by `train.py`)
+left as-is. Rationale for IterableDataset over a sampler+cache bolt-on: a global-shuffle map-style dataset
+*structurally* forces re-opens (any per-worker cache is defeated by scattered indices) — the honest fix is
+to change the unit of work, per the owner's "no patch-on-patch" rule.
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).

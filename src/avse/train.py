@@ -30,7 +30,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from avse.config import Config
-from avse.data import AVSEDataset
+from avse.data import AVSEDataset, AVSESceneStreamDataset
 from avse.losses import ImprovedAVSELoss
 from avse.metrics import si_sdr, pesq_wb, stoi_score
 from avse.models import ConvTasNetAVSE, StreamingTCNAVSE
@@ -48,7 +48,8 @@ def set_seed(s: int):
     random.seed(s); np.random.seed(s); torch.manual_seed(s); torch.cuda.manual_seed_all(s)
 
 
-def build_loader(cfg, split, bs, workers, max_windows=0, shuffle=True, seed=42, prefetch=4):
+def build_loader(cfg, split, bs, workers, max_windows=0, shuffle=True, seed=42, prefetch=4,
+                 start_epoch=0, scene_buffer=128):
     # Redirect only STDOUT to a utf-8 devnull (kills the dataset's emoji/CJK status prints); leave
     # STDERR so its ASCII tqdm scan bars stay visible — the full 'train' split is ~315k windows and
     # the scan takes a few minutes, so live progress is what stops it looking hung.
@@ -56,20 +57,27 @@ def build_loader(cfg, split, bs, workers, max_windows=0, shuffle=True, seed=42, 
     print(f"[data] loading '{split}' split{note}...", flush=True)
     t0 = time.time()
     with open(os.devnull, "w", encoding="utf-8") as dn, contextlib.redirect_stdout(dn):
-        ds = AVSEDataset(root_dir=cfg.data.root_dir, split=split, config=cfg,
-                         cache_dir=str(REPO / ".dataset_cache"))
-    if max_windows and max_windows < len(ds):
-        # Subset the windows list IN-PLACE (not Subset-over-full): each DataLoader worker pickles the
-        # dataset, so carrying only the needed windows keeps per-worker memory small on this 32 GB host
-        # (the full-dataset copy + large video tensors in shared memory exhausted the commit limit).
-        g = random.Random(seed)
-        idx = list(range(len(ds))); g.shuffle(idx)
-        ds.windows = [ds.windows[i] for i in idx[:max_windows]]
-    print(f"[data] '{split}': {len(ds)} windows in {time.time()-t0:.1f}s", flush=True)
-    return DataLoader(ds, batch_size=bs, shuffle=shuffle, num_workers=workers,
-                      pin_memory=(workers > 0), drop_last=shuffle,
-                      persistent_workers=(workers > 0),
-                      prefetch_factor=(prefetch if workers > 0 else None))
+        base = AVSEDataset(root_dir=cfg.data.root_dir, split=split, config=cfg,
+                           cache_dir=str(REPO / ".dataset_cache"))
+    # Scene-streaming view: each scene's 3 files are opened once per epoch (sequential whole-file read),
+    # not once per window. This kills the random-small-read disk wall that starved the GPU. ``max_windows``
+    # caps deterministically (whole scenes in order, last one truncated); 0 = full split. SGD shuffling is
+    # preserved by the in-dataset sliding scene pool, so the DataLoader itself must NOT shuffle.
+    ds = AVSESceneStreamDataset(base, shuffle=shuffle, seed=seed, scene_buffer=scene_buffer,
+                                max_windows=max_windows)
+    ds.set_epoch(start_epoch)
+    n_windows = len(ds)
+    # Per-worker batching of an IterableDataset drops each worker's trailing partial batch, so the true
+    # count is slightly below floor(n/bs); this estimate is for the progress-bar total only.
+    n_batches = n_windows // bs if shuffle else -(-n_windows // bs)  # drop_last=shuffle
+    print(f"[data] '{split}': {n_windows} windows ({len(ds.scene_ids)} scenes) in {time.time()-t0:.1f}s",
+          flush=True)
+    loader = DataLoader(ds, batch_size=bs, shuffle=False, num_workers=workers,
+                        pin_memory=(workers > 0), drop_last=shuffle,
+                        persistent_workers=(workers > 0),
+                        prefetch_factor=(prefetch if workers > 0 else None))
+    loader.n_batches = n_batches
+    return loader
 
 
 @torch.no_grad()
@@ -180,10 +188,11 @@ def main() -> int:
         print(f"[resume] from epoch {start_ep} (best SI-SDR {best_sisdr:.2f} dB)")
 
     train_loader = build_loader(cfg, args.train_split, args.batch, args.workers,
-                                args.max_train_windows, shuffle=True, seed=args.seed, prefetch=args.prefetch)
+                                args.max_train_windows, shuffle=True, seed=args.seed,
+                                prefetch=args.prefetch, start_epoch=start_ep)
     val_loader = build_loader(cfg, args.val_split, args.batch, args.workers,
                               args.max_val_windows, shuffle=False, seed=args.seed, prefetch=args.prefetch)
-    print(f"train batches={len(train_loader)} | val batches={len(val_loader)}\n", flush=True)
+    print(f"train batches~{train_loader.n_batches} | val batches~{val_loader.n_batches}\n", flush=True)
 
     t_start = time.time()
     epoch_bar = tqdm(range(start_ep, args.epochs), desc="epochs", position=0,
@@ -192,7 +201,7 @@ def main() -> int:
         model.train()
         run = 0.0; nb = 0; nan_skips = 0; t0 = time.time()
         bbar = tqdm(train_loader, desc=f"  ep{ep:02d}", position=1, ascii=True,
-                    dynamic_ncols=True, leave=False)
+                    total=train_loader.n_batches, dynamic_ncols=True, leave=False)
         for batch in bbar:
             vid = batch["video_frames"].to(device, non_blocking=True)
             mix = batch["mixed_audio"].to(device, non_blocking=True)

@@ -8,6 +8,37 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — Data pipeline I/O refactor: scene-streaming kills the disk wall ✅
+
+**Symptom the owner saw:** GPU utilization periodically collapsing to 0% while the dataset SSD (D:) spiked.
+Sustained hardware sampling (77 samples) confirmed it was not occasional — **D: was pegged the whole run**
+(disktime mean 437%, queue ~4.4, steady ~40 MB/s) while the **GPU was starved 51% of the time** (util mean
+45.9%), CPU only 7.5% → pure I/O wait, not compute.
+
+- ✅ **Root cause (structural, not a tuning issue):** the map-style `AVSEDataset.__getitem__` decodes one
+  *window* by opening that window's 3 files from scratch. With the DataLoader's global shuffle, consecutive
+  windows come from different scenes, so with **~315k windows over ~34.5k scenes (~9 windows/scene)** each
+  scene's `.wav`/`.wav`/`.npy` got re-opened **~9× per epoch** and re-resampled ~9×. That random-small-read
+  pattern caps an NVMe SSD at ~40 MB/s (latency/IOPS-bound: only ~80 window-reads/s) and starves the GPU.
+- ✅ **Pre-packing ruled out by disk facts (checked, not assumed):** train = **260 GB** (scenes 173.7 +
+  video 86.8), **D: has only 70 GB free** → a repacked copy doesn't fit. Fix had to be access-pattern, zero
+  extra disk.
+- ✅ **Fix = make the unit of work a SCENE, not a window** (`src/avse/data/stream_dataset.py`,
+  `AVSESceneStreamDataset(IterableDataset)`): each worker takes a disjoint scene shard; each scene's 3 files
+  are opened **once per epoch**, read whole sequentially into RAM, resampled once, then all ~9 windows are
+  sliced from memory. SGD shuffling preserved by a bounded **sliding scene pool** (≈128 scenes resident per
+  worker, windows drawn at random from the pool → a scene's overlapping windows spread across batches);
+  only raw arrays are buffered (decoded tensors live one-at-a-time) so memory stays ~1.6 GB across 6 workers.
+  Per-window slice + the joint `0.8/max` normalization are **byte-identical** to the old path → training
+  numerics unchanged, only I/O differs. `train.py` switched to it; resume/checkpoint untouched; old
+  `AVSEDataset` kept intact for `verify_data.py` / val-compat.
+- ✅ **Verified by A/B on real load** (train subset, workers 6 / batch 48, 60 samples):
+  GPU util **45.9% → 73.7%** (steady-state 80–100%), GPU-starved **51% → 20%**, D: disktime **437% → 26%**,
+  D: queue **4.37 → 0.26**. The disk wall is gone; training is now GPU-bound. `--quick` smoke passes
+  end-to-end (loss falls, eval + checkpoints write).
+- ⏭ **Next:** relaunch the definitive full-data run `p2-c7-full` on the optimized pipeline (now ~1.6× faster
+  wall-clock and rising headroom), then export `best.pt` into the HLS ROMs.
+
 ## 2026-06-25 — Full-data run prepared & hardened; ONE open task
 
 **Where we are: Phases 1–3 essentially done (C7 chosen, fit confirmed on real synth+P&R). The single
