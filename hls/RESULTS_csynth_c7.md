@@ -32,9 +32,33 @@ OUT1x1 / BOT / MASK) drives the LUT/DSP.
   ≈ **78 % BRAM / ~71 % LUT** → **fits in ONE static configuration** — exactly what the reference's
   215 % BRAM could not do. **The project's central hypothesis is confirmed in real synthesis.**
 
+## Post-route (Vivado place-and-route, the real numbers) — `export_impl.rpt`
+
+`vitis_hls -f hls/tcl/run_impl_c7.tcl` (HLS impl flow → Vivado 2022.2 synth + P&R), exit 0.
+
+| Resource | Post-route | Available | Util | (csynth est.) |
+|---|---:|---:|---:|---:|
+| **LUT** | 71,481 | 425,280 | **16.8 %** | 40.8 % |
+| **BRAM** | 987 | 2160 | **45.7 %** | 39.9 % |
+| DSP | 377 | 4272 | 8.8 % | 11.9 % |
+| FF | 40,856 | 850,560 | 4.8 % | 7.9 % |
+| URAM | 0 | 80 | 0 % | 0 % |
+
+**Timing MET** — post-route 4.932 ns < 5.000 ns target → **closes at 200 MHz**.
+
+Place-and-route LUT (17 %) is far below the csynth estimate (41 %) — HLS over-counts LUT pre-route.
+So the real picture is even stronger:
+
+> **Whole-system estimate (post-route C7 audio + reference video ~38 % BRAM / ~30 % LUT):
+> ≈ 84 % BRAM, ≈ 47 % LUT, ~9 % DSP, timing-closed at 200 MHz → FITS in ONE static configuration.**
+> The reference needed 215 % BRAM + 126 % LUT (4 bitstreams). **Fit is confirmed by real synthesis
+> AND place-and-route.** BRAM (~84 %) is now the tighter resource — a streaming C7 (vs this windowed
+> version) or a narrower decoder accumulator would widen the margin further if needed.
+
 ## Honest caveats / next steps
-- This is the **csynth estimate** (pre-place-and-route). The real number comes from Vivado synth +
-  **place-and-route** (the "布线报告") — running next via the HLS impl flow.
+- **Windowed** (non-streaming) implementation; streaming would cut BRAM further (this already fits).
+- Video is **cited** from the reference, not yet co-synthesized in one design; a monolithic
+  C7-audio + video synth is the final single-config confirmation.
 - **Windowed** (non-streaming) implementation; streaming would be smaller still (this already fits).
 - Video is **cited** from the reference, not yet co-synthesized in one design; a monolithic
   C7-audio + video synth is the final single-config confirmation.

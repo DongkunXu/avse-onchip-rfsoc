@@ -18,8 +18,11 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
   - + known video (~38% BRAM / ~30% LUT) → whole system ≈ **78% BRAM / ~71% LUT → FITS single static
     config.** The reference's 215% BRAM could not. **Central hypothesis confirmed in real synthesis.**
 - ✅ Fixed a tcl root-cause (open_project takes a name, not a path).
-- ⏭ **Next**: Vivado synth + place-and-route ("布线报告") for the real post-route numbers; then
-  (per owner) retrain C7 to a high-quality version + export real weights.
+- ✅ **Vivado place-and-route (real post-route): C7 audio = 17% LUT, 46% BRAM, 9% DSP, timing MET at
+  200 MHz** (LUT far below the csynth 41% estimate). + video → system ≈ **84% BRAM / 47% LUT → fits
+  single static config, timing-closed.** Fit confirmed by BOTH synthesis and place-and-route.
+- ◇ **OWNER GATE (per D-9 "then come back")**: fit is proven on real hardware reports. Next is the
+  high-quality retrain of C7 (full data) + real-weight export. → returning to owner.
 
 ## 2026-06-25 — Phase 2: first Pareto ◇ (owner gate — pick the operating point)
 
