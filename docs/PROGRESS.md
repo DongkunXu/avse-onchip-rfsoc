@@ -8,6 +8,19 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — Phase 3: C7 FITS in real synthesis ✅ (central hypothesis confirmed)
+
+- ✅ Implemented C7's audio mask network in synthesizable HLS (int16; encoder, 10 dilated dwsep TCN
+  blocks, hardsigmoid mask, ConvTranspose decoder; placeholder weights — fit is structure-driven, D-9).
+- ✅ Vitis HLS 2022.2 csynth (xczu48dr): **C7 audio = 40% BRAM, 41% LUT, 12% DSP** (`hls/RESULTS_csynth_c7.md`).
+  - Reference audio path was **152% BRAM** (enc 57 + dec 95) — the reason for the 4-bitstream split.
+    C7 brings it to **40%** (~3.8× less) and kills the LUT wall too.
+  - + known video (~38% BRAM / ~30% LUT) → whole system ≈ **78% BRAM / ~71% LUT → FITS single static
+    config.** The reference's 215% BRAM could not. **Central hypothesis confirmed in real synthesis.**
+- ✅ Fixed a tcl root-cause (open_project takes a name, not a path).
+- ⏭ **Next**: Vivado synth + place-and-route ("布线报告") for the real post-route numbers; then
+  (per owner) retrain C7 to a high-quality version + export real weights.
+
 ## 2026-06-25 — Phase 2: first Pareto ◇ (owner gate — pick the operating point)
 
 - ✅ Implemented C2 (streaming TCN, direct mapping) + shared `_tcn_common` refactor; training harness
