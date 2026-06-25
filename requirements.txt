@@ -19,7 +19,6 @@
 # torch>=2.7            # installed separately from cu128 index — DO NOT pin cu121
 # torchvision>=0.22
 # torchaudio>=2.7
-pytorch-lightning>=2.2.0
 
 # --- Numerics / data ---------------------------------------------------------
 numpy>=1.26.0

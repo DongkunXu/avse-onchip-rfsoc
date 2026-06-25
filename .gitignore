@@ -27,6 +27,8 @@ wandb/
 runs/
 tensorboard/
 *.log
+*.log.err            # redirected stderr of background runs (e.g. experiments/*/run.log.err)
+experiments/**/run.log*
 
 # ── Datasets / large binaries (live outside the repo: D:\DataSet\LRS3) ───
 data_cache/

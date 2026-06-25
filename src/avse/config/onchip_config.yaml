@@ -4,8 +4,7 @@
 # window, video format). The `model:` section is a PLACEHOLDER — the new architecture is chosen in
 # Phase 1 and written in Phase 2, so its hyperparameters do not belong here yet.
 #
-# Compatible with avse.config.Config.from_yaml(...). For the full reference model defaults, see
-# reference_base_config.yaml (the migrated Tier-D/E config of the OLD U-Net).
+# Compatible with avse.config.Config.from_yaml(...).
 
 data:
   root_dir: "D:/DataSet/LRS3"   # <- the dataset on THIS machine

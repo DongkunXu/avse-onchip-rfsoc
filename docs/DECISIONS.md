@@ -100,6 +100,21 @@ left as-is. Rationale for IterableDataset over a sampler+cache bolt-on: a global
 *structurally* forces re-opens (any per-worker cache is defeated by scattered indices) — the honest fix is
 to change the unit of work, per the owner's "no patch-on-patch" rule.
 
+### D-15 ✅ Removed dead migrated-from-reference code; video encoder promoted to a native model component
+**2026-06-25 — owner directed ("clean out all old/unused and other-project code; leave nothing useless").**
+Phase 2 reached its quality target by training C7 **from scratch** — distillation was never pursued — so
+the migrated 0.37 M teacher model was dead weight. Removed `src/avse/reference/{audio_encoder,avse_model,
+fusion,__init__}.py`, `src/avse/data/data_module.py` (PyTorch-Lightning DataModule, unused — `train.py`
+builds its own loader), and `src/avse/config/reference_base_config.yaml` (old U-Net config). The ONE piece
+still load-bearing — `LightweightVideoEncoder` (used by every candidate via `_tcn_common`) — was moved
+`avse/reference/video_encoder.py → avse/models/video_encoder.py` and is now a first-class model component,
+not "reference." Dropped the now-unused `pytorch-lightning` dependency. This **supersedes D-7's** "teacher
+lives in `src/avse/reference/`" (the reusable video pathway was adopted into the new project; the teacher
+itself is gone — its facts survive in `docs/reference/`). Safe vs the live training: deleted files were
+not in the running process's import graph; verified the cleaned tree imports + builds both models in an
+isolated CPU process (C7 308,544 params unchanged). `analysis/` (Phase-1 model) and `docs/reference/`
+(inherited facts) are project deliverables, not migrated junk — kept.
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).

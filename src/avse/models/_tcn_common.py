@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from avse.reference.video_encoder import LightweightVideoEncoder
+from .video_encoder import LightweightVideoEncoder
 
 
 class TCNBlock(nn.Module):

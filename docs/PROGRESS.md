@@ -8,6 +8,21 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — Dead-code cleanup (migrated teacher + Lightning removed) ✅
+
+- ✅ Removed all unused migrated-from-reference code (DECISIONS **D-15**), done **without disturbing the
+  live full-data training** (deleted files were not in the running process's import graph; verified in an
+  isolated CPU process — both models import + build, C7 still 308,544 params):
+  - deleted the dead 0.37 M teacher: `src/avse/reference/{audio_encoder,avse_model,fusion,__init__}.py`
+    (distillation was never pursued — C7 trained from scratch);
+  - deleted `src/avse/data/data_module.py` (PyTorch-Lightning DataModule — `train.py` builds its own loader);
+  - deleted `src/avse/config/reference_base_config.yaml` (old U-Net config, referenced only in a comment);
+  - **promoted** the one reused piece, `LightweightVideoEncoder`, from `avse/reference/video_encoder.py`
+    to `avse/models/video_encoder.py` (it is a native component now, not "reference"); fixed the import in
+    `_tcn_common.py`; dropped the now-unused `pytorch-lightning` dep; refreshed package docstrings.
+  - kept (NOT junk): `analysis/` (Phase-1 validated working-set model) and `docs/reference/` (the
+    intentionally self-contained inherited facts). Also cleared stray logs / throwaway quick-run dirs.
+
 ## 2026-06-25 — Data pipeline I/O refactor: scene-streaming kills the disk wall ✅
 
 **Symptom the owner saw:** GPU utilization periodically collapsing to 0% while the dataset SSD (D:) spiked.
