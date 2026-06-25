@@ -1,0 +1,54 @@
+# ── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ── Virtual environment (this project owns its own) ──────────────────────
+.venv/
+venv/
+env/
+
+# ── Experiment artifacts (regenerable; pointers tracked, blobs ignored) ──
+*.ckpt
+*.pth
+*.pt
+*.onnx
+experiments/**/checkpoints/
+experiments/**/*.ckpt
+lightning_logs/
+wandb/
+runs/
+tensorboard/
+*.log
+
+# ── Datasets / large binaries (live outside the repo: D:\DataSet\LRS3) ───
+data_cache/
+*.wav
+*.npy
+*.bin
+!analysis/**/*.bin   # keep any tiny fixtures explicitly added under analysis/
+
+# ── Hardware toolchain artifacts (Phase 3; regenerable) ──────────────────
+*.bit
+*.hwh
+*.dcp
+*.zip
+hls/**/solution*/
+hw/**/*.xpr
+hw/**/*.runs/
+hw/**/*.cache/
+
+# ── Scratch / throwaway exploration ──────────────────────────────────────
+scratch/
+*.tmp
+
+# ── OS / editor ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

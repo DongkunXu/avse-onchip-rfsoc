@@ -1,0 +1,53 @@
+# ============================================================================
+# AVSE-OnChip-RFSoC — Python dependencies
+# ============================================================================
+# Target Python: 3.11  (matches deployed reference-inference toolchain)
+# Target GPU:    NVIDIA RTX 5070 Ti  (Blackwell, sm_120)
+#
+# ⚠️  IMPORTANT — torch MUST come from the CUDA 12.8 (cu128) wheel index.
+#     Blackwell (RTX 50-series, sm_120) is NOT supported by cu121 builds.
+#     The cu121 pins inherited from the old project would silently fail here.
+#
+#     Install torch separately FIRST (see ENVIRONMENT.md):
+#         pip install torch torchvision torchaudio \
+#             --index-url https://download.pytorch.org/whl/cu128
+#
+#     Then:  pip install -r requirements.txt
+# ----------------------------------------------------------------------------
+
+# --- Deep learning framework (installed via cu128 index, listed for record) -
+# torch>=2.7            # installed separately from cu128 index — DO NOT pin cu121
+# torchvision>=0.22
+# torchaudio>=2.7
+pytorch-lightning>=2.2.0
+
+# --- Numerics / data ---------------------------------------------------------
+numpy>=1.26.0
+scipy>=1.11.0
+pandas>=2.1.0
+PyYAML>=6.0
+
+# --- Audio I/O & DSP ---------------------------------------------------------
+soundfile>=0.12.0
+librosa>=0.10.0
+
+# --- Video preprocessing -----------------------------------------------------
+opencv-python>=4.9.0
+
+# --- Speech-enhancement quality metrics (Phase 2 evaluation) ----------------
+pesq>=0.0.4          # PESQ-WB
+pystoi>=0.4.0        # STOI / ESTOI
+
+# --- Perceptual training losses (optional; needed only by the legacy loss) ---
+# asteroid and torch_pesq can lag the newest torch — install best-effort.
+# If they fail to resolve against cu128 torch, skip them; the new project may
+# replace the loss anyway. See ENVIRONMENT.md.
+# asteroid>=0.7.0
+# torch_pesq>=0.1.2
+
+# --- Logging / experiment tracking ------------------------------------------
+tensorboard>=2.15.0
+tqdm>=4.66.0
+
+# --- Plotting (analysis tables, Pareto frontiers) ---------------------------
+matplotlib>=3.8.0

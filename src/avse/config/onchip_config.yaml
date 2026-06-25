@@ -1,0 +1,33 @@
+# onchip_config.yaml — platform-stable config for AVSE-OnChip-RFSoC.
+#
+# Only the parts that are FIXED by the platform/dataset are set here (dataset path, sample rate,
+# window, video format). The `model:` section is a PLACEHOLDER — the new architecture is chosen in
+# Phase 1 and written in Phase 2, so its hyperparameters do not belong here yet.
+#
+# Compatible with avse.config.Config.from_yaml(...). For the full reference model defaults, see
+# reference_base_config.yaml (the migrated Tier-D/E config of the OLD U-Net).
+
+data:
+  root_dir: "D:/DataSet/LRS3"   # <- the dataset on THIS machine
+  batch_size: 32
+  num_workers: 12
+  init_workers: 16
+  pin_memory: true
+  prefetch_factor: 2
+  window_duration: 1.20         # 1.2 s window (matches the reference real-time budget)
+  overlap_ratio: 0.20
+
+audio:
+  sample_rate: 16000
+  chunk_size: 800
+  context_size: 18560
+  future_samples: 640
+
+video:
+  fps: 25
+  input_size: [96, 96]
+  source_size: [224, 224]
+  frames_per_chunk: 29
+  future_frames: 1
+
+# model: <TBD — set after Phase 1 picks an architecture. Do not copy the old U-Net here.>
