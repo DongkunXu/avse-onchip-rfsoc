@@ -95,7 +95,7 @@ class AVSESceneStreamDataset(IterableDataset):
     """
 
     def __init__(self, base: AVSEDataset, shuffle: bool, seed: int = 42,
-                 scene_buffer: int = 128, max_windows: int = 0):
+                 scene_buffer: int = 256, pool_mb: float = 160.0, max_windows: int = 0):
         super().__init__()
         self.scenes_dir = base.scenes_dir
         self.video_npy_dir = base.video_npy_dir
@@ -106,8 +106,13 @@ class AVSESceneStreamDataset(IterableDataset):
 
         self.shuffle = shuffle
         self.seed = seed
-        # No cross-scene mixing needed when not shuffling (val): a 1-scene pool streams in order.
+        # The sliding scene pool is bounded by BYTES, not scene count: LRS3 scene lengths are long-tailed
+        # (a 74 s scene is ~25 MB resident: 16 MB video + ~9 MB audio), so a fixed scene count blew up RAM
+        # when many long scenes clustered in one epoch's shuffle (per-worker × num_workers). ``pool_mb`` is
+        # the per-worker resident budget; ``scene_buffer`` is a secondary count cap. At least one scene is
+        # always loaded so progress is guaranteed even if a single scene exceeds the budget.
         self.scene_buffer = max(1, scene_buffer) if shuffle else 1
+        self._pool_budget_bytes = int(max(16.0, pool_mb) * 1024 * 1024)
 
         # Group windows by scene, preserving each scene's start-ordered window list. ``base.windows``
         # is already scene-contiguous and start-ordered from the scan, but group defensively.
@@ -150,6 +155,13 @@ class AVSESceneStreamDataset(IterableDataset):
         video = np.load(os.path.join(self.video_npy_dir, f"{sid}.npy"))   # full sequential read, uint8
         return mixed, target, video
 
+    @staticmethod
+    def _arrays_nbytes(arrays) -> int:
+        mixed, target, video = arrays
+        return (mixed.element_size() * mixed.nelement()
+                + target.element_size() * target.nelement()
+                + video.nbytes)
+
     def _decode(self, sid: str, arrays, w: Dict) -> Dict[str, torch.Tensor]:
         mixed, target, video = arrays
         mw = _slice_audio(mixed, w["start_sample"], self.window_samples)
@@ -185,13 +197,21 @@ class AVSESceneStreamDataset(IterableDataset):
 
         scene_iter = iter(scenes)
         cached: Dict[str, tuple] = {}                 # sid -> (mixed, target, video) raw arrays
+        sizes: Dict[str, int] = {}                    # sid -> resident bytes (to subtract on evict)
         pending: Dict[str, int] = {}                  # sid -> windows not yet emitted
         pool: List[tuple] = []                        # (sid, window_dict)
+        cached_bytes = [0]                            # boxed so the nested fill() can mutate it
 
         def fill():
-            while len(cached) < self.scene_buffer:
+            # Pull scenes until the count cap OR the byte budget is reached; always keep >=1 resident.
+            while len(cached) < self.scene_buffer and (cached_bytes[0] < self._pool_budget_bytes
+                                                       or not cached):
                 sid = next(scene_iter)                # StopIteration -> caller stops filling
-                cached[sid] = self._read_scene_arrays(sid)
+                arr = self._read_scene_arrays(sid)
+                cached[sid] = arr
+                nb = self._arrays_nbytes(arr)
+                sizes[sid] = nb
+                cached_bytes[0] += nb
                 ws = self.scene_windows[sid]
                 pending[sid] = len(ws)
                 for w in ws:
@@ -215,6 +235,7 @@ class AVSESceneStreamDataset(IterableDataset):
             if pending[sid] == 0:                     # scene fully emitted -> free it, pull more
                 del cached[sid]
                 del pending[sid]
+                cached_bytes[0] -= sizes.pop(sid)
                 try:
                     fill()
                 except StopIteration:

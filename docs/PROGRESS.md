@@ -8,6 +8,23 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-26 — Scene-pool memory fix: bound by BYTES, not scene count ✅
+
+- ⛔→✅ The first full-data run on the new pipeline finished **epoch 0 (SI-SDR +2.21 dB)** then **crashed at
+  the epoch-0→1 transition** with `MemoryError` in a DataLoader worker (`np.load` of a 16.3 MB scene npy).
+  Root cause (DECISIONS **D-16**): the sliding scene pool was capped by **scene COUNT** (`scene_buffer=128`),
+  but LRS3 scene lengths are **long-tailed** — a 74 s scene is ~25 MB resident (16 MB video + ~9 MB audio).
+  When epoch 1's shuffle clustered many long scenes into the pool, 128 scenes × 6 workers blew past the
+  32 GB host's commit limit. Counting scenes was the wrong invariant.
+- ✅ **Fix (structural):** the pool is now bounded by a **per-worker byte budget** (`--pool-mb`, default
+  160 MB), with `--scene-buffer` as a secondary count cap; `fill()` stops at whichever binds first and
+  always keeps ≥1 scene resident. Resident pool ≤ budget + one scene, *independent of the scene-size
+  distribution*. Both knobs are CLI args so RAM can be tuned without code edits.
+- ✅ **Verified two ways:** (1) single process streaming the **whole** shuffled train set (incl. the longest
+  scenes), 30 k windows — peak RSS **823 MB**, flat, no OOM; (2) 6-worker run **crossed the ep0→1 boundary**
+  (ep0 complete, ep1 to 70%) with no MemoryError. `--quick` smoke unchanged (numerics identical).
+- ⏭ Owner relaunches `p2-c7-full` (command unchanged; add `--pool-mb 120` if RAM is ever tight).
+
 ## 2026-06-25 — Dead-code cleanup (migrated teacher + Lightning removed) ✅
 
 - ✅ Removed all unused migrated-from-reference code (DECISIONS **D-15**), done **without disturbing the

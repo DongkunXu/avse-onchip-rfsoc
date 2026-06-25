@@ -49,7 +49,7 @@ def set_seed(s: int):
 
 
 def build_loader(cfg, split, bs, workers, max_windows=0, shuffle=True, seed=42, prefetch=4,
-                 start_epoch=0, scene_buffer=128):
+                 start_epoch=0, scene_buffer=256, pool_mb=160.0):
     # Redirect only STDOUT to a utf-8 devnull (kills the dataset's emoji/CJK status prints); leave
     # STDERR so its ASCII tqdm scan bars stay visible — the full 'train' split is ~315k windows and
     # the scan takes a few minutes, so live progress is what stops it looking hung.
@@ -64,7 +64,7 @@ def build_loader(cfg, split, bs, workers, max_windows=0, shuffle=True, seed=42, 
     # caps deterministically (whole scenes in order, last one truncated); 0 = full split. SGD shuffling is
     # preserved by the in-dataset sliding scene pool, so the DataLoader itself must NOT shuffle.
     ds = AVSESceneStreamDataset(base, shuffle=shuffle, seed=seed, scene_buffer=scene_buffer,
-                                max_windows=max_windows)
+                                pool_mb=pool_mb, max_windows=max_windows)
     ds.set_epoch(start_epoch)
     n_windows = len(ds)
     # Per-worker batching of an IterableDataset drops each worker's trailing partial batch, so the true
@@ -142,6 +142,10 @@ def main() -> int:
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--prefetch", type=int, default=4)
+    ap.add_argument("--pool-mb", type=float, default=160.0,
+                    help="per-worker RAM budget for the scene-streaming pool (MB); lower if RAM is tight")
+    ap.add_argument("--scene-buffer", type=int, default=256,
+                    help="max scenes held resident per worker (secondary cap; --pool-mb usually binds first)")
     ap.add_argument("--train-split", default="train")
     ap.add_argument("--val-split", default="dev")
     ap.add_argument("--max-train-windows", type=int, default=0, help="0 = all (full data)")
@@ -189,7 +193,8 @@ def main() -> int:
 
     train_loader = build_loader(cfg, args.train_split, args.batch, args.workers,
                                 args.max_train_windows, shuffle=True, seed=args.seed,
-                                prefetch=args.prefetch, start_epoch=start_ep)
+                                prefetch=args.prefetch, start_epoch=start_ep,
+                                scene_buffer=args.scene_buffer, pool_mb=args.pool_mb)
     val_loader = build_loader(cfg, args.val_split, args.batch, args.workers,
                               args.max_val_windows, shuffle=False, seed=args.seed, prefetch=args.prefetch)
     print(f"train batches~{train_loader.n_batches} | val batches~{val_loader.n_batches}\n", flush=True)

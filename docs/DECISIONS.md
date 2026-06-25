@@ -115,6 +115,17 @@ not in the running process's import graph; verified the cleaned tree imports + b
 isolated CPU process (C7 308,544 params unchanged). `analysis/` (Phase-1 model) and `docs/reference/`
 (inherited facts) are project deliverables, not migrated junk — kept.
 
+### D-16 ✅ Scene-streaming pool bounded by bytes, not scene count
+**2026-06-26.** The scene pool in D-14 was capped by scene COUNT (`scene_buffer`), which is the wrong
+invariant: LRS3 lengths are long-tailed (a 74 s scene ≈ 25 MB resident — 16 MB video + ~9 MB audio), so
+when epoch 1's shuffle clustered long scenes, 128 scenes × 6 workers exhausted the 32 GB host's commit
+limit and the full-data run OOM-crashed at the ep0→1 transition (after a healthy ep0, SI-SDR +2.21 dB).
+Fixed by bounding the pool with a **per-worker byte budget** (`--pool-mb`, default 160 MB) plus a secondary
+count cap (`--scene-buffer`); `fill()` stops at whichever binds and always keeps ≥1 scene, so resident
+memory ≤ budget + one scene regardless of scene-size distribution. Both are CLI-tunable. Verified: single
+process over the whole shuffled set (incl. longest scenes) peaks at 823 MB flat; a 6-worker run crosses the
+ep0→1 boundary with no MemoryError. Per-window numerics unchanged. Refines [D-14].
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).
