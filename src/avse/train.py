@@ -190,7 +190,7 @@ def main() -> int:
                      ascii=True, dynamic_ncols=True, leave=True)
     for ep in epoch_bar:
         model.train()
-        run = 0.0; nb = 0; t0 = time.time()
+        run = 0.0; nb = 0; nan_skips = 0; t0 = time.time()
         bbar = tqdm(train_loader, desc=f"  ep{ep:02d}", position=1, ascii=True,
                     dynamic_ncols=True, leave=False)
         for batch in bbar:
@@ -199,17 +199,25 @@ def main() -> int:
             tgt = batch["target_audio"].to(device, non_blocking=True)
             est = model({"video_frames": vid, "mixed_audio": mix})
             losses = criterion(est, tgt)
+            total = losses["total_loss"]
+            # Guard: some LRS3 windows have an all-zero (silent) target, which makes the perceptual
+            # PESQ/SI-SDR terms NaN. Skip such batches (no backward/step) so a NaN gradient never
+            # poisons the weights. Rare -> negligible data loss; counted and reported per epoch.
+            if not torch.isfinite(total):
+                nan_skips += 1
+                opt.zero_grad(set_to_none=True)
+                continue
             opt.zero_grad(set_to_none=True)
-            losses["total_loss"].backward()
+            total.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
-            run += losses["total_loss"].item(); nb += 1
-            bbar.set_postfix(loss=f"{run/nb:+.3f}", refresh=False)
+            run += total.item(); nb += 1
+            bbar.set_postfix(loss=f"{run/nb:+.3f}", skip=nan_skips, refresh=False)
         bbar.close()
 
         val = evaluate(model, val_loader, device)
         rec = {"epoch": ep, "train_loss": run / max(nb, 1), "lr": opt.param_groups[0]["lr"],
-               "val": val, "sec": round(time.time() - t0, 1)}
+               "val": val, "sec": round(time.time() - t0, 1), "nan_skips": nan_skips}
         history.append(rec)
 
         improved = val["si_sdr"] is not None and val["si_sdr"] > best_sisdr + 1e-4
@@ -237,7 +245,7 @@ def main() -> int:
             f"SI-SDR {('%.2f' % si) if si is not None else 'na'} PESQ "
             f"{('%.3f' % pe) if pe is not None else 'na'} STOI "
             f"{('%.3f' % st) if st is not None else 'na'} | best {best_sisdr:+.2f} "
-            f"| {rec['sec']:.0f}s")
+            f"| nan-skip {nan_skips} | {rec['sec']:.0f}s")
 
         sched.step()
         if args.early_stop_patience and no_improve >= args.early_stop_patience:
