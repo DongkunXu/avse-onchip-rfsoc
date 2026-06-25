@@ -37,7 +37,13 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
     memory contention hung Vivado (2 h, 0% CPU) and crashed the retrain. Killed the stuck procs,
     serialized the jobs, re-ran the P&R alone (fresh project) → clean. Lesson: **never run Vivado P&R
     and GPU training concurrently on this 32 GB machine** (see DECISIONS).
-- ⏭ Next: relaunch the (fixed) high-quality C7 retrain ALONE now that P&R is done → final quality +
+- 🔄 High-quality retrain `p2-c7-hq` RUNNING ALONE (fixed harness): C7, **40k-window subset** of the
+  315k-window train split, **data_mode=full** (noise + speech interferers), 20 epochs cosine LR.
+  Healthy: ep2 already +3.83 dB SI-SDR (> the 10-epoch run) and rising; ~437 s/epoch; VRAM 4/16 GB,
+  no spill. ETA ~20:30.
+- ⏭ Planned (owner, see `experiments/PHASE2_PLAN.md`): after this, a **full-data run** (all 315k
+  windows) + **hardware tuning** to squeeze the box (raise batch toward the 16 GB VRAM ceiling with a
+  ~1–2 GB margin, never spill to shared; more workers/prefetch; sweep batch/LR) → definitive quality +
   real-weight export.
 
 ## 2026-06-25 — Phase 2: first Pareto ◇ (owner gate — pick the operating point)

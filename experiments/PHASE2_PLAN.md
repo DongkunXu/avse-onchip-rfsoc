@@ -30,3 +30,31 @@ Levers C8/C9 are schedule/representation tweaks on a base — evaluated only if 
   the harness + get rough quality, then scale.
 - Keep models **HW-aware** (depthwise-separable convs, bounded ops, int16-friendly ranges) since the
   winner goes to HLS in Phase 3 — but Phase 2 optimises quality; HW-friendliness is structural.
+
+## Training-run roadmap (owner, 2026-06-25)
+
+1. **`p2-c7-hq` (running)** — C7, **40 000-window subset** of the LRS3 train split (full=315 253
+   windows), **data_mode=full** (both noise + competing-speech interferers, NOT noise-only), 20 epochs,
+   cosine LR. First HQ run — observe how far quality goes. (At ep2 already > the 10-epoch run.)
+2. **THEN a full-data run** — after `p2-c7-hq` finishes, retrain on the **whole** train split
+   (`--max-train-windows 0` → 315 253 windows). ~8× longer per epoch; the definitive quality model +
+   real-weight export for Phase 3.
+
+## Hardware tuning to squeeze this machine (do AFTER the current run; owner request)
+
+Goal: fully use the hardware without spilling. Measured snapshot during `p2-c7-hq` (batch 16,
+workers 3): **VRAM 4.0 / 16.3 GB (≈25 %)**, GPU util 91 %, ~437 s/epoch on 40k windows, no shared-mem
+spill. So there is large headroom to exploit:
+
+- **GPU 16 GB VRAM — use it, never overflow to shared.** Spilling to shared memory *runs but is much
+  slower*. Raise **batch size** (4 GB at bs=16 → bs≈48–64 should still fit well under 16 GB); keep a
+  **~1–2 GB safety margin**. Watch `nvidia-smi memory.used` stays < ~14.5 GB.
+- **Feed the GPU**: GPU is already 91 % at bs=16, so the data pipeline may bind at larger batch —
+  raise **workers** (e.g. 4–6) and/or **prefetch** so the bigger batches don't starve. Balance against
+  the 32 GB system RAM and the in-place window-subset fix (so workers stay light).
+- **System RAM 32 GB** (commit ~42 GB): serialize with Vivado (DECISIONS D-11). Full-data (315k
+  windows) makes the dataset/window-list bigger — keep workers modest and watch committed memory.
+- **Sweep other params** for the best throughput/quality balance: batch, LR (scale with batch), workers,
+  prefetch, epochs. Pick the config that maximises GPU utilisation while staying within VRAM + RAM.
+
+> These tunings apply to the **full-data run**; the current `p2-c7-hq` is left untouched to finish.
