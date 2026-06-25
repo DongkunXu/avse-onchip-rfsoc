@@ -24,8 +24,13 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 - ✅ Fit proven on real hardware reports (synth + P&R). Owner gate resolved (**D-10**):
   next = (1) **monolithic integrated synth** (C7 audio + video in ONE design → real total fit),
   then (2) **high-quality retrain** on full data. Parallelised: retrain on GPU, monolithic synth on CPU.
-- ⏭ In progress: launch high-quality C7 retrain (background GPU); build + synthesize the monolithic
-  C7-audio + video HLS design.
+- ✅ **Monolithic integrated synth** (C7 audio + video in ONE design, `c7_avse_top`): whole-system
+  csynth = **70% BRAM, 90% LUT (estimate), 28% DSP — fits one static config** (`hls/RESULTS_avse_monolithic.md`).
+  vs reference 215% BRAM / 126% LUT (4 bitstreams). LUT 90% is the csynth over-estimate (standalone
+  went 41%→17% post-route); Vivado P&R running for the definitive total.
+  - Clean refactor: audio compute extracted to `c7_audio_core.hpp` (shared by both tops).
+- 🔄 In progress: monolithic P&R (background CPU) for the real post-route total; high-quality C7
+  retrain (background GPU, ~3h) for final quality + real-weight export.
 
 ## 2026-06-25 — Phase 2: first Pareto ◇ (owner gate — pick the operating point)
 
