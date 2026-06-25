@@ -8,6 +8,19 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — Phase 2 underway: data verified + C7 implemented
+
+- ✅ `tools/verify_data.py`: LRS3 pipeline loads end-to-end on this machine (dev 3365 scenes →
+  25272 windows in 13.3s; shapes correct). De-risks training.
+- ✅ `experiments/PHASE2_PLAN.md`: C4 anchored to reference quality; C2 + C7 trained; working-set
+  instrumentation ties trained quality back to the Phase-1 axis.
+- ✅ `src/avse/models/conv_tasnet_avse.py` (**C7**): Conv-TasNet-style time-domain AVSE, no U-Net
+  skips, reuses the validated video encoder, HW-aware (dwsep dilated convs, BN, PReLU). **308,544
+  params**; forward+backward verified on CPU and on the RTX 5070 Ti (Blackwell). `onchip_config.yaml`
+  given a minimal video-only `model:` section (audio backbone params are per-candidate Python args).
+- ⏭ **Next**: implement C2 (streaming TCN), build the training harness + working-set instrumentation,
+  run short trainings to validate the loop, then scale to the quality-vs-working-set Pareto.
+
 ## 2026-06-25 — Owner gate resolved; candidate set expanded (D-2, D-8)
 
 - ✅ Owner decisions recorded: **D-2 = time-domain only** (C3/STFT parked), **D-8 = prototype C4 + C2 +

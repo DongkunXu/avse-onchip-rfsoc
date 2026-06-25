@@ -30,4 +30,11 @@ video:
   frames_per_chunk: 29
   future_frames: 1
 
-# model: <TBD — set after Phase 1 picks an architecture. Do not copy the old U-Net here.>
+# Model section — only the VIDEO pathway is fixed here (it is reused across all candidates and
+# is cheap / not the residency wall). Each candidate's AUDIO backbone params (e.g. Conv-TasNet
+# N/L/B/H/X/R, or TCN width/depth) are passed as Python args to the model, NOT set here — the new
+# audio architecture is deliberately not the old U-Net.
+model:
+  video_channels: 96     # reused LightweightVideoEncoder (validated, ~30x96 embedding)
+  video_layers: 3
+

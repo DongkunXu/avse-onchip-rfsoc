@@ -1,6 +1,11 @@
-"""NEW hardware-shaped AVSE architectures (written fresh in Phase 2).
+"""NEW hardware-shaped AVSE architectures (Phase 2).
 
-Empty until the Phase-1 scoring table is built and the owner picks 2-3 directions to prototype
-(streaming TCN / recurrent / STFT-mask / tiled-U-Net / single-engine-global-pool / ...).
-Do NOT copy the reference U-Net here — see ../reference/ for the teacher (distillation only).
+Phase-1 picked time-domain candidates (DECISIONS D-2/D-8). Implemented here:
+  - C7 ConvTasNetAVSE — single-resolution time-domain mask, no U-Net skips (headline).
+  - C2 StreamingTCNAVSE — dilated causal TCN backbone (to come).
+The reference U-Net is NOT copied here; see ../reference/ for the teacher (distillation only).
 """
+
+from .conv_tasnet_avse import ConvTasNetAVSE
+
+__all__ = ["ConvTasNetAVSE"]
