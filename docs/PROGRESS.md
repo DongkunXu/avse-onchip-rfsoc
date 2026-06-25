@@ -8,6 +8,21 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — Phase 1: candidate scoring table produced ◇ (owner gate)
+
+- ✅ `analysis/candidates.py` — 7 candidates encoded (C0 reference, C6 pool-only, C5 DDR-staged,
+  C4 tiled, C1 streaming-chunked, C2 streaming-TCN, C3 STFT-mask), each scored by the **validated**
+  peak-live model. Fit verdict is on the whole system (audio peak-live + ~65% shared video/fusion/
+  weight overhead).
+- ✅ `analysis/score_candidates.py` → `results/candidate_scoring.md`. Result:
+  - **C0 / C6 DO NOT FIT (~140%)** — sharpened proof that Axis-3 (pool/schedule the same U-Net) alone fails.
+  - **C4 tiled (74%), C1 chunked (70%), C2 TCN (77%), C3 STFT (67%) all FIT**; C5 DDR-staged borderline (90%).
+- ✅ Fixed two issues honestly: a `%`-format bug (literal `%` in a `%`-formatted string → f-string),
+  and a correctness gap (fit verdict now counts the shared video/fusion overhead, not audio-only).
+- ◇ **OWNER GATE**: pick the 2–3 directions for Phase 2 + resolve DECISIONS **D-2 (time vs STFT)**,
+  which gates whether C3 is in scope. Recommended shortlist: **C4 (safe anchor) + C2 (novelty, time) +
+  C3 (highest novelty, needs D-2)**. → returning to owner.
+
 ## 2026-06-25 — Phase 1: working-set model built & VALIDATED ✅
 
 - ✅ Investigated the reference HLS source (`UNet-AVSE-Vitis/src/ip_*/...top.cpp`, `common/types.hpp`)
