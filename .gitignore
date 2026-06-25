@@ -20,7 +20,8 @@ env/
 *.onnx
 experiments/**/checkpoints/
 experiments/**/*.ckpt
-experiments/*quick*/          # throwaway smoke runs (real runs are tracked)
+# throwaway smoke runs (real runs are tracked); .gitignore has no inline comments
+experiments/*quick*/
 lightning_logs/
 wandb/
 runs/
