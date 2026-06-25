@@ -65,6 +65,13 @@ encoder in ONE HLS design → the *real* whole-system single-config fit number (
 estimate); (2) **high-quality retrain** of C7 on full data + export real weights. Owner also asked to
 **update the docs first**. (Parallelisable: retrain is GPU, monolithic synth is CPU.)
 
+### D-11 ✅ Serialize Vivado P&R and GPU training on this 32 GB host
+**2026-06-25.** This machine has **32 GB RAM** (commit limit ~42 GB), not the 196 GB the old project's
+notes assumed. Running a Vivado place-and-route concurrently with a GPU training job exhausted the
+Windows commit limit: the retrain crashed (error 1455) and Vivado synth hung (2 h at 0 % CPU). **Run
+heavy jobs one at a time** — Vivado P&R alone, then training alone. The training harness was also
+hardened (subset windows in-place so workers don't copy the full dataset; per-epoch checkpoints).
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).

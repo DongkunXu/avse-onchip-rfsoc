@@ -29,12 +29,16 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
   vs reference 215% BRAM / 126% LUT (4 bitstreams). LUT 90% is the csynth over-estimate (standalone
   went 41%→17% post-route); Vivado P&R running for the definitive total.
   - Clean refactor: audio compute extracted to `c7_audio_core.hpp` (shared by both tops).
-- 🔄 In progress: monolithic P&R (background CPU) for the real post-route total.
-- ⚠️ High-quality retrain crashed at ep7 (val SI-SDR 3.77 and rising) — Windows commit-limit error
-  1455 on this **32 GB** host: `Subset` over the full 250k-window dataset made every DataLoader worker
-  copy all windows, and large video tensors in worker shared memory accumulated. **Fixed** (subset
-  windows in-place, pin_memory gated on workers, per-epoch checkpoints). Will relaunch with fewer
-  workers once P&R frees memory (avoids CPU/RAM contention on this shared host).
+- ✅ **MONOLITHIC P&R DONE — the definitive whole-system total**: complete AVSE (C7 audio + video,
+  ONE design) post-route = **80% BRAM, 41% LUT, 20% DSP, 200 MHz timing MET** (`hls/RESULTS_avse_monolithic.md`).
+  vs reference 215% BRAM / 126% LUT (4 PCAP bitstreams). **The whole AVSE fits in ONE static config,
+  timing-closed — the project's central goal, proven on real place-and-route.**
+  - Hit a snag first: ran the monolithic P&R concurrently with the GPU retrain on this 32 GB host →
+    memory contention hung Vivado (2 h, 0% CPU) and crashed the retrain. Killed the stuck procs,
+    serialized the jobs, re-ran the P&R alone (fresh project) → clean. Lesson: **never run Vivado P&R
+    and GPU training concurrently on this 32 GB machine** (see DECISIONS).
+- ⏭ Next: relaunch the (fixed) high-quality C7 retrain ALONE now that P&R is done → final quality +
+  real-weight export.
 
 ## 2026-06-25 — Phase 2: first Pareto ◇ (owner gate — pick the operating point)
 
