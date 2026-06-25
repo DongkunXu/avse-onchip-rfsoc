@@ -8,6 +8,21 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — Phase 2: first Pareto ◇ (owner gate — pick the operating point)
+
+- ✅ Implemented C2 (streaming TCN, direct mapping) + shared `_tcn_common` refactor; training harness
+  `avse/train.py`; Pareto builder. Fixed warnings + a `.gitignore` inline-comment bug + a pystoi
+  sentinel — all at root, no cruft.
+- ✅ **Trained C7 and C2** (10 epochs, 10k train windows, dev-160 eval) on the RTX 5070 Ti:
+  - **C7 Conv-TasNet (mask): SI-SDR +3.79 dB, PESQ 1.565, STOI 0.690** — still rising at ep9, already
+    ≈ the reference FP32 (+3.99 dB) at **0.017 MB** deployable working set (vs reference 4.1 MB).
+  - C2 streaming-TCN (mapping): +1.12 dB — dominated by C7 → **masking beats direct mapping** (clean
+    ablation, consistent with Conv-TasNet literature).
+- ✅ `experiments/build_pareto.py` → `pareto.md` + `pareto.png`. C7 is the standout: near-reference
+  quality, smallest working set, fits single-config, strongest circuits story.
+- ◇ **OWNER GATE**: pick the Phase-3 operating point. Recommend **C7** as primary (push its training
+  further), **C4 tiled** as the high-quality safe anchor. → returning to owner.
+
 ## 2026-06-25 — Phase 2 underway: data verified + C7 implemented
 
 - ✅ `tools/verify_data.py`: LRS3 pipeline loads end-to-end on this machine (dev 3365 scenes →

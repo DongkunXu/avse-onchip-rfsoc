@@ -14,14 +14,18 @@ themselves are git-ignored — store a path/pointer, not the blob.
 
 ## Registry
 
-| exp_id | date | candidate / arch | est. peak working set | SI-SDR | PESQ-WB | STOI | params | status | notes |
+| exp_id | date | candidate / arch | deployable working set | SI-SDR | PESQ-WB | STOI | params | status | notes |
 |---|---|---|---|---|---|---|---|---|---|
-| _(none yet — Phase 2 not started)_ | | | | | | | | | |
+| p2-c7-r1 | 2026-06-25 | C7 Conv-TasNet (mask) | 0.017 MB | **+3.79** | **1.565** | **0.690** | 308,544 | done | 10ep/10k win; still rising at ep9; ≈ reference FP32 (+3.99) at 1/240 the working set |
+| p2-c2-r1 | 2026-06-25 | C2 streaming-TCN (mapping) | 0.033 MB | +1.12 | 1.478 | 0.672 | 343,616 | done | 10ep/10k win; dominated by C7 → masking > direct mapping |
 
 ## Reference anchors (for comparison, not experiments)
 
 | name | SI-SDR | PESQ-WB | STOI | note |
 |---|---|---|---|---|
-| Noisy input | — | — | — | lower bound (fill from data) |
-| Teacher (0.37 M FP32) | — | — | — | the distillation target; fill when the ckpt is located |
-| Deployed int16 (reference FPGA) | matches FP32 (cos 0.977, SNR +18.1 dB) | — | — | from the old project's N=160 eval |
+| Reference FP32 AV (PAPER_DATA §B, N=3319) | +3.99 | 1.673 | 0.741 | the teacher's quality; C7 already ≈ this after a small run |
+| Deployed INT16 AV (PAPER_DATA §B, N=496) | +5.46 | 1.743 | 0.738 | reference FPGA; working set 4.1 MB, does NOT fit single-config |
+
+> Caveat: anchor metrics are from PAPER_DATA on different eval subsets than the p2-* runs (dev-160).
+> The comparison is indicative for screening, not a controlled head-to-head. C7/C2 are small runs
+> (10 epochs / 10k windows) and still improving — their quality is a lower bound.
