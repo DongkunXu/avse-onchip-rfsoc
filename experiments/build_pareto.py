@@ -39,12 +39,16 @@ def load_runs():
         if "quick" in mj.parent.name:
             continue
         d = json.loads(mj.read_text(encoding="utf-8"))
-        fv = d.get("final_val") or {}
+        # Use the BEST-SI-SDR epoch (that is the checkpoint we would deploy, best.pt), not the last.
+        hist = d.get("history") or []
+        cand = [h for h in hist if h.get("val", {}).get("si_sdr") is not None]
+        bestv = max(cand, key=lambda h: h["val"]["si_sdr"])["val"] if cand else (d.get("final_val") or {})
+        mtw = d["args"].get("max_train_windows")
         rows.append({
             "label": f"{d['model'].upper()} {d.get('model_name','')}".strip(),
-            "si_sdr": fv.get("si_sdr"), "pesq": fv.get("pesq_wb"), "stoi": fv.get("stoi"),
+            "si_sdr": bestv.get("si_sdr"), "pesq": bestv.get("pesq_wb"), "stoi": bestv.get("stoi"),
             "ws_mb": d.get("deployable_working_set_mb"), "params": d.get("params"),
-            "note": f"trained {d['args'].get('epochs')}ep / {d['args'].get('max_train_windows')} win",
+            "note": f"best of {d['args'].get('epochs')}ep / {'full' if not mtw else str(mtw)+' win'}",
             "exp_id": d["exp_id"],
         })
     return rows

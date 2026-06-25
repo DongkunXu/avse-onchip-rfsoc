@@ -8,6 +8,19 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — C7 40k high-quality run done; full-data run ready
+
+- ✅ `p2-c7-hq` (C7, 40k-window subset, 20 epochs, cosine LR) finished: **best SI-SDR +4.89 dB (ep16)**,
+  PESQ 1.683, STOI 0.718; final ep19 +4.79. **Exceeds the FP32 reference (+3.99 dB)** at **0.017 MB**
+  working set (1/240 of the reference). Trajectory 2.82 → 4.25(ep5) → 4.69(ep10) → 4.89(ep16). Pareto
+  regenerated (now uses best-SI-SDR epoch). C7 clearly has headroom; full data expected to push higher.
+- ✅ Training harness upgraded for the definitive run: dual ASCII progress bars (epochs/batches, live
+  metrics, single-line), early-stop (patience 5), 80 epochs, full data, per-epoch resumable checkpoint
+  + trend.png. CPU-verified (smoke + resume). Owner will launch the full-data run.
+- ⏭ **Owner to launch** the full-data run (all 315k windows, 80 epochs, early-stop 5) with the
+  configured command (see chat / PHASE2_PLAN). Then export best.pt real weights into the HLS ROMs for
+  a quality-accurate Phase-3 deployment.
+
 ## 2026-06-25 — Phase 3: C7 FITS in real synthesis ✅ (central hypothesis confirmed)
 
 - ✅ Implemented C7's audio mask network in synthesizable HLS (int16; encoder, 10 dilated dwsep TCN
