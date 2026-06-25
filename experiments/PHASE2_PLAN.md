@@ -58,3 +58,29 @@ spill. So there is large headroom to exploit:
   prefetch, epochs. Pick the config that maximises GPU utilisation while staying within VRAM + RAM.
 
 > These tunings apply to the **full-data run**; the current `p2-c7-hq` is left untouched to finish.
+
+## Full-data run — verified command + operational notes (2026-06-25)
+
+`p2-c7-hq` finished: **best +4.89 dB SI-SDR (ep16)** > FP32 reference (+3.99). The full-data run is the
+next step. The harness was hardened and smoke-verified end-to-end (scan + train + resume + NaN guard).
+
+**Launch (owner-run; harness handles everything):**
+```
+cd G:\phD_Projects\AVSE-OnChip-RFSoC
+.\.venv\Scripts\python.exe -m avse.train --model c7 --exp-id p2-c7-full --epochs 80 \
+    --early-stop-patience 5 --batch 32 --workers 4 --prefetch 4 --max-train-windows 0 --lr 5e-4
+```
+Resume after any stop: same line + `--resume`. (`--batch 48` is the headroom option; watch VRAM < ~14.5 GB.)
+
+What the harness now does (all verified):
+- **Window cache** (`.dataset_cache/`): the 315k-window train scan loads in ~0.2 s (pre-built).
+- **Dual ASCII progress bars** (epochs/batches), live SI-SDR/PESQ/STOI/best/`nan-skip`; `trend.png` per epoch.
+- **Early-stop** patience 5; **per-epoch resumable checkpoint**; ASCII-only output.
+- **NaN guard** (D-12): all-zero (silent) target windows make PESQ loss NaN; such batches are skipped
+  (reported as `nan-skip N`, expected to be small). This caused the first attempt to go `loss=nan` at
+  ep0 — now handled.
+- Run it **alone** (not alongside Vivado P&R) on this 32 GB host (D-11).
+
+**After it finishes**: take `experiments/p2-c7-full/best.pt`, export the int16 weights into the HLS
+weight ROMs (`hls/src/c7_audio_core.hpp` + `c7_video.hpp` currently use index-seeded placeholders), and
+re-run the HLS flow for a quality-accurate (not just fit) deployment + final end-to-end eval.

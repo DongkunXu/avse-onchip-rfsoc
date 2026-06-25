@@ -52,12 +52,32 @@ the **dataflow and on-chip memory hierarchy** so a *whole* AVSE pipeline co-resi
 3. [`docs/ROADMAP.md`](docs/ROADMAP.md) — the phased plan and where we are now
 4. [`docs/PROGRESS.md`](docs/PROGRESS.md) — the running log of what's done / in progress / next
 
-## Status
+## Status (updated 2026-06-25)
 
-**Pre-Phase-1 — scaffolding complete.** Project structure, reference facts, reusable assets, and the
-environment are in place. No research code, no training, no synthesis yet. Next concrete deliverable:
-the analytical working-set model ([`analysis/`](analysis/)), validated against the reference design's
-known numbers, feeding the candidate-architecture scoring table.
+**Phases 1–3 essentially complete; the definitive full-data quality run is the one open task.**
+
+- **Phase 1 (analytical) — DONE.** A working-set model (`analysis/`) validated against the reference
+  (reproduces its 215 % concurrent BRAM and 95 % audio_dec from buffer sizes) scored the candidates and
+  picked **C7 — a Conv-TasNet-style, time-domain mask network with NO U-Net skips** (so the
+  skip-residency wall that forced the reference into 4 bitstreams simply does not exist).
+- **Phase 2 (PyTorch) — DONE; full-data run pending.** C7 implemented in `src/avse/models/` and trained:
+  the 40k-window run peaks at **+4.89 dB SI-SDR** (PESQ 1.68, STOI 0.72) — *above* the FP32 reference
+  (+3.99 dB) — at a **0.017 MB** deployable working set (1/240 of the reference). Pareto in
+  `experiments/pareto.png`. The definitive **full-data run** (`p2-c7-full`, 315k windows, 80 epochs,
+  early-stop 5) is configured and ready; **the owner launches it** (command in
+  [`experiments/PHASE2_PLAN.md`](experiments/PHASE2_PLAN.md)).
+- **Phase 3 (hardware) — FIT CONFIRMED on real reports.** Vitis HLS 2022.2 synth + Vivado place-and-route:
+  - standalone C7 audio path: **46 % BRAM, 17 % LUT, 200 MHz** (post-route).
+  - **monolithic whole AVSE (audio + video, one design): 80 % BRAM, 41 % LUT, 20 % DSP, 200 MHz — fits
+    in ONE static configuration** (`hls/RESULTS_avse_monolithic.md`). The reference needed 215 % BRAM /
+    126 % LUT across 4 PCAP bitstreams. **The project's central hypothesis is proven on real silicon
+    reports** (with placeholder weights — fit is structure-driven).
+
+### The one open task
+Launch the full-data C7 run (above), then **export its best weights into the HLS weight ROMs** for a
+quality-accurate deployment + final end-to-end eval. Operational notes: run heavy jobs **one at a time**
+on this 32 GB host (Vivado P&R vs GPU training — DECISIONS D-11); the dataset window-list is cached
+(`.dataset_cache/`) so runs start in ~0.2 s. Full timeline in [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Environment
 

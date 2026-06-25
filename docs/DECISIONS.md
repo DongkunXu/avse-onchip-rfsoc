@@ -72,8 +72,24 @@ Windows commit limit: the retrain crashed (error 1455) and Vivado synth hung (2 
 heavy jobs one at a time** — Vivado P&R alone, then training alone. The training harness was also
 hardened (subset windows in-place so workers don't copy the full dataset; per-epoch checkpoints).
 
+### D-12 ✅ Skip non-finite-loss batches (silent-target NaN), don't filter data
+**2026-06-25.** Some LRS3 windows have an all-zero (silent) target; torch_pesq's PESQ loss returns NaN
+on a silent reference, which (via one NaN gradient) poisons the weights. Chosen fix: **skip any batch
+whose total loss is non-finite** (no backward/step) and report `nan-skip N` per epoch. Rationale: it is
+robust to *any* NaN source, costs negligible data (such windows are rare), and avoids touching the
+asteroid/torch_pesq internals or doing an expensive per-window energy scan of the dataset.
+
+### D-13 ✅ Cache the dataset window list on disk
+**2026-06-25.** The train-split scan (34.5k scenes → 315k windows) is disk-bound (~13–23 min). The
+window list is cached to `.dataset_cache/<split>_<window-params>.json` so reruns/`--resume` start in
+~0.2 s. Keyed by split + window params so it self-invalidates on a config change; git-ignored.
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).
 - ~~after Phase 1: pick directions~~ → resolved (D-8: C4 + C2 + C5, + open exploration → C7/C8/C9).
-- **◇ after Phase 2**: pick the Pareto-frontier operating point (quality vs working-set).
+- ~~after Phase 2: pick the operating point~~ → resolved (D-9: **C7**; Pareto confirmed C7 dominant).
+- ~~after Phase 3 fit: monolithic total then retrain~~ → resolved (D-10: monolithic P&R done, 80% BRAM
+  one config; high-quality retrain in progress).
+- **◇ OPEN**: owner launches the **full-data C7 run** (`p2-c7-full`); then export `best.pt` real weights
+  into the HLS ROMs and re-run the HLS flow for the quality-accurate deployment + final eval.

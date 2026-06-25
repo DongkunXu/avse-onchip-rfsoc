@@ -8,6 +8,31 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — Full-data run prepared & hardened; ONE open task
+
+**Where we are: Phases 1–3 essentially done (C7 chosen, fit confirmed on real synth+P&R). The single
+open task is the owner-launched full-data C7 quality run, then real-weight export into the HLS ROMs.**
+
+- ✅ Training harness made production-grade for the long run (`src/avse/train.py`):
+  - **Dual ASCII progress bars** (epochs/batches, single-line, live SI-SDR/PESQ/STOI/best/patience),
+    no emoji/CJK; **early-stop** (patience 5); **80 epochs**; full data; **per-epoch resumable
+    checkpoint** + `--resume`; per-epoch **trend.png**.
+  - **On-disk window cache** (`.dataset_cache/`, git-ignored): the ~13–23 min train scan (34.5k scenes
+    → 315 253 windows) now loads in **~0.2 s** on rerun/resume. ASCII scan progress bar shown (was
+    fully suppressed → looked hung). Train cache pre-built and verified.
+  - **NaN guard**: some LRS3 windows have an all-zero (silent) target → torch_pesq PESQ loss = NaN →
+    poisoned weights. Now **non-finite-loss batches are skipped** (no backward/step); `nan-skip N`
+    reported per epoch. Confirmed: a silent batch is skipped, weights stay finite. (This bit the first
+    full-run attempt at ep0 — fixed before the real run.)
+- ⏭ **OPEN TASK (owner launches)**: the full-data run, then export `best.pt` weights into the HLS
+  weight ROMs (`hls/src/*`, currently placeholder) for a quality-accurate deployment + final eval.
+  ```
+  cd G:\phD_Projects\AVSE-OnChip-RFSoC
+  .\.venv\Scripts\python.exe -m avse.train --model c7 --exp-id p2-c7-full --epochs 80 \
+      --early-stop-patience 5 --batch 32 --workers 4 --prefetch 4 --max-train-windows 0 --lr 5e-4
+  ```
+  (Resume with the same line + `--resume`. Do NOT run it while Vivado P&R runs — 32 GB host, D-11.)
+
 ## 2026-06-25 — C7 40k high-quality run done; full-data run ready
 
 - ✅ `p2-c7-hq` (C7, 40k-window subset, 20 epochs, cosine LR) finished: **best SI-SDR +4.89 dB (ep16)**,
