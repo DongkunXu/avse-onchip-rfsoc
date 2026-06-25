@@ -8,6 +8,28 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — Phase 1: working-set model built & VALIDATED ✅
+
+- ✅ Investigated the reference HLS source (`UNet-AVSE-Vitis/src/ip_*/...top.cpp`, `common/types.hpp`)
+  to get ground-truth buffer lists + partition pragmas (not guessed). data_t = ap_fixed<16,7> (16-bit).
+- ✅ `analysis/working_set.py` — core model: `Buffer/Module/Design`, first-principles BRAM18/URAM
+  mapping (RAMB18=1024 words, cyclic-partition banking, ping-pong), + liveness `peak_live_working_set`.
+- ✅ `analysis/baseline_reference.py` — the reference 4-IP design encoded from the real buffer lists.
+- ✅ `analysis/validate_baseline.py` — the trust gate. **PASSES**: audio_dec (binding IP) predicted
+  0.96× measured (91.2 % vs 95 %), URAM exact (36.2 % vs 36 %), concurrent activation 193 % vs measured
+  215 % total (gap = known weight+working residual). Activations confirmed as the wall, quantitatively.
+- ✅ Fixed a real bug honestly (not bypassed): cp1252 console crashed on a Unicode glyph →
+  root-caused to stdout encoding; reconfigured stdout to UTF-8 + ASCII-only report symbols.
+- ✅ Key finding (`analysis/results/baseline_validation.md`): audio static 4.1 MB vs **peak-live 2.4 MB
+  (1.70×)** — even perfect pooling of the same U-Net topology can't fit; a winner **must bound the
+  live temporal extent** (Axis 1/2), not just schedule (Axis 3). First model-backed steer.
+- ⏭ **Next**: encode candidate architectures as `Design`s under `analysis/candidates/` and score them
+  with the validated model → the *approach × peak-activation × resources × risk × effort* table.
+
+### Notes / known approximations
+- Video IP modelled to 0.63× (DATAFLOW ping-pong + dense temporal weights inflate it); deliberately
+  not over-fit since video is not the residency wall. Documented in the results file.
+
 ## 2026-06-25 — Project bootstrap
 
 - ✅ New independent repository created at `G:\phD_Projects\AVSE-OnChip-RFSoC` (own git, parallel to
