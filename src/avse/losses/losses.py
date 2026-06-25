@@ -144,8 +144,8 @@ class ImprovedAVSELoss(nn.Module):
         # STFT loss: directly penalises spectral artifacts
         losses['stft_loss'] = self.stft_loss_func(pred, target)
 
-        # Perceptual losses — must run in float32
-        with torch.cuda.amp.autocast(enabled=False):
+        # Perceptual losses — must run in float32 (device-aware; modernized from torch.cuda.amp)
+        with torch.amp.autocast(device_type=('cuda' if pred.is_cuda else 'cpu'), enabled=False):
             pred_fp32 = pred.float()
             target_fp32 = target.float()
 

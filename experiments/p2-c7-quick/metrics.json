@@ -1,0 +1,44 @@
+{
+  "exp_id": "p2-c7-quick",
+  "model": "c7",
+  "model_name": "ConvTasNetAVSE (mask)",
+  "params": 308544,
+  "deployable_working_set_elems": 8416,
+  "deployable_working_set_mb": 0.0168,
+  "args": {
+    "model": "c7",
+    "config": "G:\\phD_Projects\\AVSE-OnChip-RFSoC\\src\\avse\\config\\onchip_config.yaml",
+    "epochs": 1,
+    "batch": 8,
+    "lr": 0.0003,
+    "workers": 0,
+    "train_split": "dev",
+    "val_split": "dev",
+    "max_train_windows": 64,
+    "max_val_windows": 32,
+    "seed": 42,
+    "exp_id": null,
+    "quick": true
+  },
+  "device": "cuda",
+  "total_sec": 4.3,
+  "history": [
+    {
+      "epoch": 0,
+      "train_loss": 12.684034142299833,
+      "val": {
+        "si_sdr": -13.046659194859169,
+        "pesq_wb": 1.0355239771306515,
+        "stoi": 0.6054784520464426,
+        "n": 32
+      },
+      "sec": 4.3
+    }
+  ],
+  "final_val": {
+    "si_sdr": -13.046659194859169,
+    "pesq_wb": 1.0355239771306515,
+    "stoi": 0.6054784520464426,
+    "n": 32
+  }
+}

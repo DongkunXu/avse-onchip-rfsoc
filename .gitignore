@@ -20,6 +20,7 @@ env/
 *.onnx
 experiments/**/checkpoints/
 experiments/**/*.ckpt
+experiments/*quick*/          # throwaway smoke runs (real runs are tracked)
 lightning_logs/
 wandb/
 runs/

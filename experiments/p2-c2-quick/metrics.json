@@ -1,0 +1,44 @@
+{
+  "exp_id": "p2-c2-quick",
+  "model": "c2",
+  "model_name": "StreamingTCNAVSE (mapping)",
+  "params": 343616,
+  "deployable_working_set_elems": 16608,
+  "deployable_working_set_mb": 0.0332,
+  "args": {
+    "model": "c2",
+    "config": "G:\\phD_Projects\\AVSE-OnChip-RFSoC\\src\\avse\\config\\onchip_config.yaml",
+    "epochs": 1,
+    "batch": 8,
+    "lr": 0.0003,
+    "workers": 0,
+    "train_split": "dev",
+    "val_split": "dev",
+    "max_train_windows": 64,
+    "max_val_windows": 32,
+    "seed": 42,
+    "exp_id": null,
+    "quick": true
+  },
+  "device": "cuda",
+  "total_sec": 6.9,
+  "history": [
+    {
+      "epoch": 0,
+      "train_loss": 28.978739030722735,
+      "val": {
+        "si_sdr": -33.78719559586792,
+        "pesq_wb": 1.044701736420393,
+        "stoi": 0.4533479396666217,
+        "n": 32
+      },
+      "sec": 6.8
+    }
+  ],
+  "final_val": {
+    "si_sdr": -33.78719559586792,
+    "pesq_wb": 1.044701736420393,
+    "stoi": 0.4533479396666217,
+    "n": 32
+  }
+}
