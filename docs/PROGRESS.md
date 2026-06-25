@@ -21,8 +21,11 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 - ✅ **Vivado place-and-route (real post-route): C7 audio = 17% LUT, 46% BRAM, 9% DSP, timing MET at
   200 MHz** (LUT far below the csynth 41% estimate). + video → system ≈ **84% BRAM / 47% LUT → fits
   single static config, timing-closed.** Fit confirmed by BOTH synthesis and place-and-route.
-- ◇ **OWNER GATE (per D-9 "then come back")**: fit is proven on real hardware reports. Next is the
-  high-quality retrain of C7 (full data) + real-weight export. → returning to owner.
+- ✅ Fit proven on real hardware reports (synth + P&R). Owner gate resolved (**D-10**):
+  next = (1) **monolithic integrated synth** (C7 audio + video in ONE design → real total fit),
+  then (2) **high-quality retrain** on full data. Parallelised: retrain on GPU, monolithic synth on CPU.
+- ⏭ In progress: launch high-quality C7 retrain (background GPU); build + synthesize the monolithic
+  C7-audio + video HLS design.
 
 ## 2026-06-25 — Phase 2: first Pareto ◇ (owner gate — pick the operating point)
 

@@ -58,6 +58,13 @@ quality training. (Pareto: C7 +3.79 dB SI-SDR small-run, 0.017 MB working set; C
 fallback.) Toolchain on this machine is **Vitis HLS / Vivado 2022.2** (not 2024.2) — fine for the fit
 check on ZU48DR.
 
+### D-10 ✅ Next: monolithic total-fit synth, then high-quality retrain
+**2026-06-25 — owner.** Fit is confirmed (C7 audio: synth 40%/41%, **post-route 46% BRAM / 17% LUT,
+200 MHz timing met**). Next, in order: (1) **monolithic integrated synth** — C7 audio + the video
+encoder in ONE HLS design → the *real* whole-system single-config fit number (not the audio+video
+estimate); (2) **high-quality retrain** of C7 on full data + export real weights. Owner also asked to
+**update the docs first**. (Parallelisable: retrain is GPU, monolithic synth is CPU.)
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).

@@ -120,6 +120,7 @@ def main() -> int:
 
     criterion = ImprovedAVSELoss(cfg.loss).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs))
 
     history = []
     t_start = time.time()
@@ -140,12 +141,13 @@ def main() -> int:
             if bi % 20 == 0:
                 print(f"  ep{ep} b{bi}/{len(train_loader)} loss={run/nb:.4f}", flush=True)
         val = evaluate(model, val_loader, device)
-        rec = {"epoch": ep, "train_loss": run / max(nb, 1),
+        rec = {"epoch": ep, "train_loss": run / max(nb, 1), "lr": opt.param_groups[0]["lr"],
                "val": val, "sec": round(time.time() - t0, 1)}
         history.append(rec)
-        print(f"ep{ep}: train_loss={rec['train_loss']:.4f} | "
+        print(f"ep{ep}: train_loss={rec['train_loss']:.4f} lr={rec['lr']:.2e} | "
               f"val SI-SDR={val['si_sdr']:.2f}dB PESQ={val['pesq_wb']} STOI={val['stoi']} "
               f"({rec['sec']}s)", flush=True)
+        sched.step()
 
     torch.save(model.state_dict(), out / "checkpoint.pt")
     result = {
