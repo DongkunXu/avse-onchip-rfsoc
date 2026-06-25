@@ -21,7 +21,7 @@ except (AttributeError, OSError):
 from pathlib import Path
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 
 from avse.config import Config
 from avse.data import AVSEDataset
@@ -42,15 +42,20 @@ def set_seed(s: int):
     random.seed(s); np.random.seed(s); torch.manual_seed(s); torch.cuda.manual_seed_all(s)
 
 
-def build_loader(cfg, split, bs, workers, max_windows=0, shuffle=True, seed=42):
+def build_loader(cfg, split, bs, workers, max_windows=0, shuffle=True, seed=42, prefetch=2):
     ds = AVSEDataset(root_dir=cfg.data.root_dir, split=split, config=cfg)
     if max_windows and max_windows < len(ds):
+        # Subset the windows list IN-PLACE (not Subset-over-full): each DataLoader worker pickles the
+        # dataset, so carrying only the needed windows (not all ~250k) keeps per-worker memory small.
+        # Important on this 32 GB host — the full-dataset copy + large video tensors in shared memory
+        # exhausted the Windows commit limit (error 1455) on long runs.
         g = random.Random(seed)
         idx = list(range(len(ds))); g.shuffle(idx)
-        ds = Subset(ds, idx[:max_windows])
+        ds.windows = [ds.windows[i] for i in idx[:max_windows]]
     return DataLoader(ds, batch_size=bs, shuffle=shuffle, num_workers=workers,
-                      pin_memory=True, drop_last=shuffle,
-                      persistent_workers=(workers > 0))
+                      pin_memory=(workers > 0), drop_last=shuffle,
+                      persistent_workers=(workers > 0),
+                      prefetch_factor=(prefetch if workers > 0 else None))
 
 
 @torch.no_grad()
@@ -123,6 +128,7 @@ def main() -> int:
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs))
 
     history = []
+    best_sisdr = -1e9
     t_start = time.time()
     for ep in range(args.epochs):
         model.train()
@@ -147,6 +153,18 @@ def main() -> int:
         print(f"ep{ep}: train_loss={rec['train_loss']:.4f} lr={rec['lr']:.2e} | "
               f"val SI-SDR={val['si_sdr']:.2f}dB PESQ={val['pesq_wb']} STOI={val['stoi']} "
               f"({rec['sec']}s)", flush=True)
+        # Checkpoint every epoch so a crash (e.g. a long-run DataLoader memory error) doesn't lose
+        # progress; also keep the best-by-SI-SDR snapshot. metrics.json is rewritten each epoch too.
+        torch.save(model.state_dict(), out / "checkpoint.pt")
+        if val["si_sdr"] is not None and val["si_sdr"] >= best_sisdr:
+            best_sisdr = val["si_sdr"]
+            torch.save(model.state_dict(), out / "best.pt")
+        (out / "metrics.json").write_text(json.dumps(
+            {"exp_id": exp_id, "model": args.model, "model_name": name,
+             "params": model.num_params(), "deployable_working_set_elems": ws,
+             "deployable_working_set_mb": round(ws * 2 / 1e6, 4), "args": vars(args),
+             "device": device, "history": history,
+             "final_val": history[-1]["val"], "best_si_sdr": best_sisdr}, indent=2), encoding="utf-8")
         sched.step()
 
     torch.save(model.state_dict(), out / "checkpoint.pt")
