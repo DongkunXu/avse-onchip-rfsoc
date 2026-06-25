@@ -68,7 +68,13 @@ def stoi_score(ref, est, sr: int = SAMPLE_RATE, extended: bool = False) -> Optio
     try:
         from pystoi import stoi
         v = float(stoi(ref, est, sr, extended=extended))
-        return v if np.isfinite(v) else None
+        if not np.isfinite(v):
+            return None
+        # pystoi returns exactly 1e-5 as a sentinel when a window has too few STFT frames after
+        # silent-frame removal (it warns). Treat that as "not measurable" rather than a real 0 score.
+        if abs(v - 1e-5) < 1e-12:
+            return None
+        return v
     except Exception:
         return None
 
