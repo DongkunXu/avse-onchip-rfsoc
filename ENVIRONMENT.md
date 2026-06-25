@@ -67,6 +67,6 @@ D:/DataSet/LRS3` in the config.
 
 | Tool | Version | Use |
 |---|---|---|
-| Vitis HLS | 2024.2 | C-synth of the HLS IP(s) |
-| Vivado | 2024.2 | Block design + bitstream |
+| Vitis HLS | **2022.2** (installed at `D:\Xilinx\Vitis_HLS\2022.2`; `bin/vitis_hls.bat`) | C-synth of the HLS IP(s) |
+| Vivado | **2022.2** (`D:\Xilinx\Vivado\2022.2`; `bin/vivado.bat`) | synth + place-and-route + bitstream |
 | Board | Real Digital RFSoC 4x2 (ZU48DR, `xczu48dr-ffvg1517-2-e`) | `ssh xilinx@172.26.206.133` (pw `xilinx`, DHCP — verify IP). PYNQ env: `source /etc/profile.d/pynq_venv.sh && source /etc/profile.d/xrt_setup.sh`; PL ops need `sudo`. |

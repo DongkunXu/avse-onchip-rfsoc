@@ -49,6 +49,15 @@ model architectures are written from scratch** in `src/avse/models/` — the mig
 
 ---
 
+### D-9 ✅ Phase 3 = HLS-fit-first on C7, with placeholder weights
+**2026-06-25 — owner.** Take **C7 (Conv-TasNet-style)** to Phase 3. **First confirm the structure
+actually fits** via real Vitis HLS C-synth + Vivado synth/P&R reports, **then** come back to iterate /
+retrain a high-quality version. Key consequence: fit is structure-driven, not weight-value-driven, so
+Phase 3a synthesizes C7 with **placeholder weights** to get the fit answer fast, decoupled from
+quality training. (Pareto: C7 +3.79 dB SI-SDR small-run, 0.017 MB working set; C4 is the high-quality
+fallback.) Toolchain on this machine is **Vitis HLS / Vivado 2022.2** (not 2024.2) — fine for the fit
+check on ZU48DR.
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).

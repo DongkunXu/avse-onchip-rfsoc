@@ -41,6 +41,7 @@ data_cache/
 *.dcp
 *.zip
 hls/**/solution*/
+hls/build/
 hw/**/*.xpr
 hw/**/*.runs/
 hw/**/*.cache/
