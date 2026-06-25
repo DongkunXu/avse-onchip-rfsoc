@@ -10,11 +10,19 @@ delete (mark old ones `SUPERSEDED`). Status: ✅ decided · ◇ open (owner) · 
 architecture (long time axis + U-Net skips). Escaping it requires re-architecting, not refactoring.
 New repo, own git/venv/docs; old project is reference-only.
 
-### D-2 ◇ Time-domain vs STFT / frequency-domain — OPEN (owner call before Phase 2)
-Moving to an STFT-domain mask is the most fundamental (root-cause) change — it makes
-frame-synchronous streaming natural — but the biggest departure from the reference. Staying
-time-domain weights the dataflow axes (streaming / tiling / DDR) instead. **Phase 1 will score both
-families; the owner chooses before Phase 2 training begins.**
+### D-2 ✅ Time-domain ONLY (for now); STFT/frequency deferred
+**2026-06-25 — owner.** Phase 2 stays time-domain. The STFT-mask candidate (C3) is **out of scope**
+for now (revisit only if time-domain options underdeliver on the quality-vs-fit Pareto). Rationale:
+lower risk, no FPGA (i)STFT, closer to the existing know-how. Frequency domain is the biggest
+departure and is parked, not killed.
+
+### D-8 ✅ Phase-2 candidate set + open exploration mandate
+**2026-06-25 — owner.** Prototype **C4 (tiled U-Net)** and **C2 (streaming TCN)**; keep **C5
+(DDR-staged)** as the Plan-B control. Owner explicitly mandated exploring **additional time-domain
+ideas beyond the documented candidates** ("don't be limited by the old docs; think for yourself;
+more attempts encouraged"). Added by analysis (scored with the validated model): **C7 Conv-TasNet-style
+time-domain mask** (removes the U-Net skip wall — the root cause — while staying time-domain),
+plus **C8 recompute-skip** and **C9 compressed-skip** as combinable BRAM-reclaim levers.
 
 ### D-3 ✅ Precision locked at int16
 **Inherited.** int8/DPU costs −1.6 to −2.9 dB SI-SDR and breaks the quality floor; QAT judged
@@ -43,6 +51,6 @@ model architectures are written from scratch** in `src/avse/models/` — the mig
 
 ## Pending owner gates (forward-looking)
 
-- **◇ before Phase 2 start**: D-2 (time-domain vs STFT).
-- **◇ after Phase 1**: pick the 2–3 candidate directions from the scoring table.
-- **◇ after Phase 2**: pick the Pareto-frontier operating point.
+- ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).
+- ~~after Phase 1: pick directions~~ → resolved (D-8: C4 + C2 + C5, + open exploration → C7/C8/C9).
+- **◇ after Phase 2**: pick the Pareto-frontier operating point (quality vs working-set).

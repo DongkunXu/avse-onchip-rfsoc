@@ -82,6 +82,8 @@ class Candidate:
     quality_risk: str           # low | moderate | high  (+ one-line reason)
     effort: str                 # low | moderate | high
     notes: str = ""
+    in_scope: bool = True       # False -> excluded by an owner decision (e.g. D-2), shown for record
+    combinable_lever: bool = False  # True -> a BRAM-reclaim lever best COMBINED, not a standalone arch
 
     @property
     def peak_live_mb(self) -> float:
@@ -179,9 +181,60 @@ def all_candidates() -> List[Candidate]:
         "C3", "STFT-domain mask (frame-sync)", "freq", "Axis 1 (representation change)",
         peak_live_elems=stft_per_frame,
         reuses_weights=False, quality_risk="high (biggest departure; iSTFT/overlap-add on FPGA)",
-        effort="high",
-        notes=f"Operate on spectrogram [{F_bins} x ~75]; predict T-F mask frame-by-frame -> peak ~C*F "
-              f"({stft_per_frame:,} elems). Root-cause fix (peak decoupled from window) but needs "
-              "owner D-2 (time vs freq) and FPGA STFT/iSTFT. Dominant SE paradigm -> quality upside."))
+        effort="high", in_scope=False,
+        notes="OUT OF SCOPE per D-2 (time-domain only for now). Kept for record: operate on spectrogram "
+              f"[{F_bins} x ~75], predict T-F mask frame-by-frame -> peak ~C*F ({stft_per_frame:,} elems). "
+              "Root-cause fix but needs FPGA STFT/iSTFT. Revisit only if time-domain underdelivers."))
+
+    # ───────────────────────────────────────────────────────────────────────────────────────────
+    #  New, self-derived time-domain candidates (owner mandate D-8: think beyond the old docs).
+    #  All attack the validated root cause — the U-Net skip-residency wall — without leaving time.
+    # ───────────────────────────────────────────────────────────────────────────────────────────
+
+    # C7 — Conv-TasNet-style time-domain mask: encoder (1 strided conv -> single-resolution latent),
+    #      TCN separator predicting a mask, decoder (transposed conv). NO multi-resolution U-Net skips
+    #      at all -> the skip-residency wall simply does not exist. The most direct time-domain attack
+    #      on the root cause. Proven, strong SE quality; streams naturally (single resolution).
+    N_tas, stride_tas = 128, 16
+    T_lat = FULL_T // stride_tas                       # 1200 latent frames
+    tas_streamed = N_tas * 256                         # TCN ring state over ~256 latent frames (~256ms)
+    tas_full = 3 * N_tas * T_lat                       # non-streamed: latent + mask + masked
+    cands.append(Candidate(
+        "C7", "Conv-TasNet-style time mask (no U-Net skips)", "time", "Axis 1 (remove skip topology)",
+        peak_live_elems=tas_streamed,
+        reuses_weights=False, quality_risk="moderate (proven SE family; new arch, distillable)",
+        effort="moderate-high",
+        notes=f"encoder(stride {stride_tas}) -> latent[{N_tas} x {T_lat}] -> TCN mask -> decoder. "
+              f"NO multi-resolution skips -> NO co-residency wall. Streamed peak ~{tas_streamed:,} elems; "
+              f"even non-streamed ~{tas_full:,} (~{tas_full*2/1e6:.1f}MB) with no skip wall. Time-domain, "
+              "frame-synchronous, distillable from the 0.37M teacher. STRONG root-cause candidate."))
+
+    # C8 — Recompute-skip U-Net (lever): keep the U-Net, but DON'T store the two shallow skips (skip0
+    #      32x9600, skip1 64x4800 = 55% of resident); regenerate them in the decoder by re-running
+    #      enc layers 0-1 from a stored coarse checkpoint. Trades compute (DSP 31%, 2x latency spare)
+    #      for BRAM (the wall) — exploits the exact resource asymmetry. Best COMBINED with tiling.
+    recompute_resident = (96 * 2400) + (128 * 1200) + (192 * 600)  # only deep skips + bottleneck kept
+    cands.append(Candidate(
+        "C8", "Recompute-skip U-Net (regenerate shallow skips)", "time", "Axis 2 (recompute-vs-store)",
+        peak_live_elems=recompute_resident,
+        reuses_weights=True, quality_risk="low (bit-identical; pure schedule/recompute)",
+        effort="moderate-high", combinable_lever=True,
+        notes="Don't store skip0/skip1 (55% of resident); recompute them on demand from a coarse "
+              "checkpoint. Trades cheap compute for scarce BRAM. ~half the skip residency. Borderline "
+              "alone; shines COMBINED with tiling/streaming. Reuses the trained weights."))
+
+    # C9 — Compressed-skip U-Net (lever): store the shallow skips at reduced channel count via a 1x1
+    #      bottleneck (skip0 32->8, skip1 64->16), expand in the decoder. Directly shrinks the
+    #      dominant C*T term. Small quality cost; needs a light retrain of the bottlenecks.
+    compressed_resident = (8 * 9600) + (16 * 4800) + (96 * 2400) + (128 * 1200) + (192 * 600)
+    cands.append(Candidate(
+        "C9", "Compressed-skip U-Net (learned skip bottleneck)", "time", "Axis 1+4 (capacity knob)",
+        peak_live_elems=compressed_resident,
+        reuses_weights=False, quality_risk="low-moderate (slight loss from skip compression)",
+        effort="moderate", combinable_lever=True,
+        notes="Store shallow skips at reduced channels (32->8, 64->16) -> attacks the dominant C*T "
+              "directly (~40% less resident). Borderline alone; combine with tiling. Light retrain. "
+              "Also viable but not separately scored: sub-band multirate (learned filterbank) and "
+              "dual-path chunked-recurrent (DPRNN-style) — both time-domain, bounded peak."))
 
     return cands

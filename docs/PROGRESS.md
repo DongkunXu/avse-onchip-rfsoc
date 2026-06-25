@@ -8,6 +8,19 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-25 — Owner gate resolved; candidate set expanded (D-2, D-8)
+
+- ✅ Owner decisions recorded: **D-2 = time-domain only** (C3/STFT parked), **D-8 = prototype C4 + C2 +
+  C5(plan-B)** with an explicit mandate to explore beyond the old docs.
+- ✅ Self-derived new time-domain candidates added & scored: **C7 Conv-TasNet-style mask** (no
+  multi-resolution skips → no residency wall; sys 67%, fits — the headline new candidate), plus
+  levers **C8 recompute-skip** (sys 94%, borderline alone) and **C9 compressed-skip** (sys 103%, must
+  combine). C3 marked out-of-scope. (`results/candidate_scoring.md` regenerated.)
+- ✅ **Phase-2 set decided: C4 (anchor/control) + C2 (TCN) + C7 (Conv-TasNet, root-cause removal)**;
+  C5 plan-B; C8/C9 combinable levers.
+- ⏭ **Next (Phase 2)**: plan + verify the LRS3 data pipeline end-to-end, then implement the 3
+  architectures and train small versions for the quality-vs-working-set Pareto.
+
 ## 2026-06-25 — Phase 1: candidate scoring table produced ◇ (owner gate)
 
 - ✅ `analysis/candidates.py` — 7 candidates encoded (C0 reference, C6 pool-only, C5 DDR-staged,

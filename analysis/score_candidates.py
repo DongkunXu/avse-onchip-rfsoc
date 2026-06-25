@@ -32,10 +32,13 @@ def main() -> int:
     hdr = (f"{'key':<4} {'approach':<34} {'fam':<5} {'peak-live':>10} {'audio':>6} {'sys':>5} "
            f"{'fit':<14} {'reuse':<6} {'risk':<9} {'effort'}")
     print(hdr); print("-" * len(hdr))
+    def status(c):
+        return "out:D-2" if not c.in_scope else ("lever" if c.combinable_lever else "")
     for c in cands:
         print(f"{c.key:<4} {c.name[:34]:<34} {c.family:<5} "
               f"{c.peak_live_mb:>8.2f}MB {c.bram_pct:>5.0f}% {c.system_bram_pct:>4.0f}% {c.fit_verdict:<14} "
-              f"{'yes' if c.reuses_weights else 'no':<6} {c.quality_risk.split('(')[0].strip():<9} {c.effort}")
+              f"{'yes' if c.reuses_weights else 'no':<6} {c.quality_risk.split('(')[0].strip():<9} "
+              f"{c.effort:<14} {status(c)}")
     print(f"\n(sys = audio peak-live + ~{int(__import__('candidates').SHARED_OVERHEAD_PCT)}% shared "
           f"video+fusion+weights overhead; fit verdict is on the whole single-config system.)")
 
@@ -51,11 +54,12 @@ def main() -> int:
         f"~{SHARED_OVERHEAD_PCT:.0f}% shared overhead every single-config design also carries (video "
         f"encoder ~38% + fusion ~32% + weight/working residue, lightly deduped). **The fit verdict is "
         f"on `sys%` — the whole system co-resident in one static configuration.**\n")
-    lines.append("| key | approach | family | axis | peak-live | audio% | sys% | fit | reuses weights | quality risk | effort |")
-    lines.append("|---|---|---|---|---:|---:|---:|---|:--:|---|---|")
+    lines.append("| key | approach | family | axis | peak-live | audio% | sys% | fit | status | reuses weights | quality risk | effort |")
+    lines.append("|---|---|---|---|---:|---:|---:|---|---|:--:|---|---|")
     for c in cands:
+        st = "out (D-2)" if not c.in_scope else ("lever" if c.combinable_lever else "—")
         lines.append(f"| {c.key} | {c.name} | {c.family} | {c.axis} | {c.peak_live_mb:.2f} MB | "
-                     f"{c.bram_pct:.0f}% | {c.system_bram_pct:.0f}% | {c.fit_verdict} | "
+                     f"{c.bram_pct:.0f}% | {c.system_bram_pct:.0f}% | {c.fit_verdict} | {st} | "
                      f"{'✅' if c.reuses_weights else '—'} | {c.quality_risk} | {c.effort} |")
     lines.append("\n## Notes per candidate\n")
     for c in cands:
@@ -67,19 +71,21 @@ def main() -> int:
                  "NOT FIT.** This is the sharpened, model-backed form of the validated finding: "
                  "**time-multiplexing/pooling the same U-Net (Axis 3 alone) cannot fit the system.**")
     lines.append("- **Bounding the live temporal extent works**: tiling/streaming (C4/C1) and "
-                 "representation change (C2/C3) drop peak-live by 8–100x into comfortable-fit territory.")
-    lines.append("- **Two clusters of trade-off** for the owner:")
-    lines.append("  - *Low quality-risk, reuse-the-model*: **C5 (DDR-staged)**, **C4 (tiled U-Net)** — "
-                 "math-(near-)identical, inherit the 0.37M weights, moderate effort. Safe fit.")
-    lines.append("  - *Higher novelty, stronger circuits story*: **C2 (streaming TCN)**, "
-                 "**C3 (STFT-mask)** — peak fully decoupled from window length; need retrain/distill "
-                 "and (C3) an owner call on time-vs-frequency (DECISIONS D-2).")
-    lines.append("\n## Recommended shortlist to bring to Phase 2 (owner decides)\n")
-    lines.append("A spread across the risk/novelty axis, all of which the model says fit:")
-    lines.append("1. **C4 Tiled U-Net** — lowest-risk fit, reuses the trained model; the safe anchor / control.")
-    lines.append("2. **C2 Streaming TCN** — strong circuits novelty (O(state) dataflow), distillable, time-domain (no D-2 needed).")
-    lines.append("3. **C3 STFT-mask** — highest novelty + quality upside, but gated on owner D-2 (time vs frequency) and FPGA (i)STFT.")
-    lines.append("\n*C5 (DDR-staged) is kept as the Plan-B control; C6 documents that schedule-only is not enough.*")
+                 "single-resolution masking (C2/C7) drop peak-live by 6–25x into comfortable-fit territory.")
+    lines.append("- **The cleanest time-domain attack on the root cause is C7** (Conv-TasNet-style): it "
+                 "has **no multi-resolution U-Net skips at all**, so the skip-residency wall simply does "
+                 "not exist — without leaving the time domain (D-2).")
+    lines.append("- **Decision context**: D-2 = time-domain only, so **C3 (STFT) is out of scope** "
+                 "(kept for record). C8/C9 are BRAM-reclaim *levers* — best combined with a base "
+                 "architecture, not run standalone.")
+    lines.append("\n## Phase-2 set (owner D-8 + analysis)\n")
+    lines.append("1. **C4 Tiled U-Net** — lowest-risk fit, reuses the trained 0.37M model; the safe anchor / control.")
+    lines.append("2. **C2 Streaming TCN** — strong circuits novelty (O(state) dataflow), distillable, time-domain.")
+    lines.append("3. **C7 Conv-TasNet-style mask** — removes the U-Net skip wall (root cause) while staying "
+                 "time-domain; proven SE quality. The headline new candidate.")
+    lines.append("\n*C5 (DDR-staged) kept as the Plan-B control; C8/C9 (recompute/compressed skip) are "
+                 "levers to combine if a base architecture needs more headroom; C6 documents that "
+                 "schedule-only is not enough; C3 parked by D-2.*")
     lines.append("\n> These peak-live numbers are analytical screening (Phase 1). Phase 2 trains small "
                  "versions to put **quality** on the same axis and produce the quality-vs-working-set "
                  "Pareto frontier before any HLS.")
