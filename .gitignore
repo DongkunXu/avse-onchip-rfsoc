@@ -30,6 +30,7 @@ tensorboard/
 
 # ── Datasets / large binaries (live outside the repo: D:\DataSet\LRS3) ───
 data_cache/
+.dataset_cache/
 *.wav
 *.npy
 *.bin

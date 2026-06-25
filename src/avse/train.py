@@ -49,14 +49,15 @@ def set_seed(s: int):
 
 
 def build_loader(cfg, split, bs, workers, max_windows=0, shuffle=True, seed=42, prefetch=4):
-    # Suppress the dataset's verbose (non-ASCII) init logging for clean output; errors still raise.
-    print(f"[data] loading '{split}' split (scanning windows)...", flush=True)
+    # Redirect only STDOUT to a utf-8 devnull (kills the dataset's emoji/CJK status prints); leave
+    # STDERR so its ASCII tqdm scan bars stay visible — the full 'train' split is ~315k windows and
+    # the scan takes a few minutes, so live progress is what stops it looking hung.
+    note = " (~315k windows, scan takes a few minutes)" if split == "train" else ""
+    print(f"[data] loading '{split}' split{note}...", flush=True)
     t0 = time.time()
-    # devnull opened utf-8 (not the cp1252 locale default) so the dataset's emoji/CJK prints don't
-    # raise UnicodeEncodeError when redirected here on Windows.
-    with open(os.devnull, "w", encoding="utf-8") as dn, \
-            contextlib.redirect_stdout(dn), contextlib.redirect_stderr(dn):
-        ds = AVSEDataset(root_dir=cfg.data.root_dir, split=split, config=cfg)
+    with open(os.devnull, "w", encoding="utf-8") as dn, contextlib.redirect_stdout(dn):
+        ds = AVSEDataset(root_dir=cfg.data.root_dir, split=split, config=cfg,
+                         cache_dir=str(REPO / ".dataset_cache"))
     if max_windows and max_windows < len(ds):
         # Subset the windows list IN-PLACE (not Subset-over-full): each DataLoader worker pickles the
         # dataset, so carrying only the needed windows keeps per-worker memory small on this 32 GB host

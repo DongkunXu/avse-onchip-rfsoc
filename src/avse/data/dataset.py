@@ -19,10 +19,14 @@ class AVSEDataset(Dataset):
     每个样本都是固定长度的窗口，模拟流式处理
     """
 
-    def __init__(self, root_dir: str, split: str, config):
+    def __init__(self, root_dir: str, split: str, config, cache_dir: Optional[str] = None):
         self.root_dir = root_dir
         self.split = split
         self.config = config
+        # Optional on-disk cache of the (slow to build) window list. Scanning the train split's
+        # ~34k scenes for audio lengths takes ~20 min on a spinning disk; caching makes reruns and
+        # --resume start in ~1 s. Keyed by split + window params so it auto-invalidates on a change.
+        self.cache_dir = cache_dir
 
         # 动态窗口参数（从配置文件读取）
         self.window_duration = getattr(config.data, 'window_duration', 0.64)  # 默认640ms
@@ -68,11 +72,36 @@ class AVSEDataset(Dataset):
         print(f"   Video source: preprocessed .npy ({self.video_npy_dir})")
         
         start_time = time.time()
-        self.windows = self._create_windows_parallel()
+        self.windows = self._create_windows_cached()
         end_time = time.time()
-        
+
         print(f"\n✅ Dataset ready: {len(self.windows)} windows ({end_time - start_time:.2f}s)")
         print("-" * 50)
+
+    def _create_windows_cached(self) -> List[Dict]:
+        """Build the window list, using an on-disk JSON cache keyed by split + window params."""
+        if not self.cache_dir:
+            return self._create_windows_parallel()
+        key = (f"{self.split}_dur{self.window_duration}_ov{self.overlap_ratio}"
+               f"_mode{self.data_mode}.json")
+        cache_file = os.path.join(self.cache_dir, key)
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    w = json.load(f)
+                print(f"   [cache] loaded {len(w)} windows from {cache_file}")
+                return w
+            except Exception as e:
+                print(f"   [cache] load failed ({e}); rescanning")
+        w = self._create_windows_parallel()
+        try:
+            os.makedirs(self.cache_dir, exist_ok=True)
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(w, f)
+            print(f"   [cache] saved {len(w)} windows to {cache_file}")
+        except Exception as e:
+            print(f"   [cache] save failed ({e})")
+        return w
     
     def _load_json_metadata(self) -> Dict[str, Dict]:
         """Load and parse JSON metadata for scene filtering"""
@@ -247,8 +276,8 @@ class AVSEDataset(Dataset):
                 for scene_id in scene_ids
             }
             
-            pbar = tqdm(total=len(scene_ids), desc="Getting audio lengths", 
-                       unit="scene", leave=True, ncols=80)
+            pbar = tqdm(total=len(scene_ids), desc="  scanning audio lengths",
+                       unit="scene", leave=False, ncols=80, ascii=True)
             
             for future in as_completed(future_to_scene):
                 try:
@@ -317,8 +346,8 @@ class AVSEDataset(Dataset):
                 for scene_data in scene_data_list
             }
             
-            pbar = tqdm(total=len(scene_data_list), desc="Creating windows", 
-                       unit="scene", leave=True, ncols=80)
+            pbar = tqdm(total=len(scene_data_list), desc="  creating windows",
+                       unit="scene", leave=False, ncols=80, ascii=True)
             
             for future in as_completed(future_to_scene):
                 try:
