@@ -81,16 +81,26 @@ def build_loader(cfg, split, bs, workers, max_windows=0, shuffle=True, seed=42, 
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, max_pesq_stoi=120):
-    """SI-SDR over all eval samples; PESQ/STOI over the first `max_pesq_stoi` (they are slow)."""
+def evaluate(model, loader, device, criterion, max_pesq_stoi=120):
+    """Validation **total loss** (the exact training objective, measured on held-out data) — this is the
+    model-selection / early-stop criterion — plus the SI-SDR / PESQ / STOI quality metrics (kept for
+    reporting). The total loss is the comprehensive objective: SI-SDR is just one of its terms (weight
+    0.5) alongside PESQ (3.0), STOI (4.0), L1/L2/multiscale/STFT. SI-SDR over all samples; PESQ/STOI over
+    the first `max_pesq_stoi` (they are slow). Non-finite-loss batches (silent-target NaN, DECISIONS D-12)
+    are skipped in the loss average, mirroring the training loop."""
     model.eval()
     sis, pesqs, stois = [], [], []
     n_perc = 0
+    loss_sum = 0.0; loss_nb = 0
     for batch in loader:
         vid = batch["video_frames"].to(device)
         mix = batch["mixed_audio"].to(device)
-        tgt = batch["target_audio"]
-        est = model({"video_frames": vid, "mixed_audio": mix}).cpu()
+        tgt_d = batch["target_audio"].to(device)
+        est = model({"video_frames": vid, "mixed_audio": mix})
+        tl = criterion(est, tgt_d)["total_loss"]
+        if torch.isfinite(tl):
+            loss_sum += tl.item(); loss_nb += 1
+        est = est.cpu(); tgt = batch["target_audio"]
         for i in range(est.shape[0]):
             e = est[i, 0].numpy(); t = tgt[i, 0].numpy()
             sis.append(si_sdr(e, t))
@@ -100,7 +110,8 @@ def evaluate(model, loader, device, max_pesq_stoi=120):
                 if s is not None: stois.append(s)
                 n_perc += 1
     def m(a): return float(np.mean(a)) if a else None
-    return {"si_sdr": m(sis), "pesq_wb": m(pesqs), "stoi": m(stois), "n": len(sis)}
+    return {"loss": (loss_sum / loss_nb) if loss_nb else None,
+            "si_sdr": m(sis), "pesq_wb": m(pesqs), "stoi": m(stois), "n": len(sis)}
 
 
 def save_trend(history, path):
@@ -125,10 +136,10 @@ def save_trend(history, path):
         pass
 
 
-def write_metrics(out, base, history, best):
+def write_metrics(out, base, history, best_val_loss):
     (out / "metrics.json").write_text(json.dumps(
         {**base, "history": history, "final_val": history[-1]["val"] if history else None,
-         "best_si_sdr": best}, indent=2), encoding="utf-8")
+         "best_val_loss": best_val_loss}, indent=2), encoding="utf-8")
 
 
 def main() -> int:
@@ -182,14 +193,24 @@ def main() -> int:
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs))
 
-    history, best_sisdr, start_ep, no_improve = [], -1e9, 0, 0
+    history, best_val_loss, start_ep, no_improve = [], float("inf"), 0, 0
     ckpt_path = out / "checkpoint.pt"
     if args.resume and ckpt_path.exists():
         ck = torch.load(ckpt_path, map_location=device)
         model.load_state_dict(ck["model"]); opt.load_state_dict(ck["opt"]); sched.load_state_dict(ck["sched"])
-        history = ck.get("history", []); best_sisdr = ck.get("best_sisdr", -1e9)
-        start_ep = ck.get("epoch", -1) + 1; no_improve = ck.get("no_improve", 0)
-        print(f"[resume] from epoch {start_ep} (best SI-SDR {best_sisdr:.2f} dB)")
+        history = ck.get("history", [])
+        start_ep = ck.get("epoch", -1) + 1
+        if "best_val_loss" in ck:
+            best_val_loss = ck["best_val_loss"]; no_improve = ck.get("no_improve", 0)
+            print(f"[resume] from epoch {start_ep} (best val-loss {best_val_loss:.4f})")
+        else:
+            # Pre-val-loss checkpoint: model selection used to track val SI-SDR. Switch to the val total
+            # loss. Past val-losses were never computed (evaluate only logged metrics) and can't be
+            # recovered, so comprehensive-best tracking restarts here: best/early-stop reset, and the
+            # FIRST completed epoch after resume sets the new baseline (then each epoch updates it).
+            best_val_loss = float("inf"); no_improve = 0
+            print(f"[resume] from epoch {start_ep}; switching model selection to val TOTAL LOSS "
+                  f"(fresh tracking: best/early-stop reset, next epoch sets the baseline)")
 
     train_loader = build_loader(cfg, args.train_split, args.batch, args.workers,
                                 args.max_train_windows, shuffle=True, seed=args.seed,
@@ -229,47 +250,54 @@ def main() -> int:
             bbar.set_postfix(loss=f"{run/nb:+.3f}", skip=nan_skips, refresh=False)
         bbar.close()
 
-        val = evaluate(model, val_loader, device)
+        val = evaluate(model, val_loader, device, criterion)
         rec = {"epoch": ep, "train_loss": run / max(nb, 1), "lr": opt.param_groups[0]["lr"],
                "val": val, "sec": round(time.time() - t0, 1), "nan_skips": nan_skips}
         history.append(rec)
 
-        improved = val["si_sdr"] is not None and val["si_sdr"] > best_sisdr + 1e-4
+        # Model selection + early-stop on the val TOTAL LOSS (lower is better) — the comprehensive
+        # objective, not SI-SDR alone. best.pt holds the lowest-val-loss weights seen.
+        vloss = val["loss"]
+        improved = vloss is not None and vloss < best_val_loss - 1e-5
         if improved:
-            best_sisdr = val["si_sdr"]; no_improve = 0
+            best_val_loss = vloss; no_improve = 0
             torch.save(model.state_dict(), out / "best.pt")
         else:
             no_improve += 1
 
         torch.save({"epoch": ep, "model": model.state_dict(), "opt": opt.state_dict(),
-                    "sched": sched.state_dict(), "best_sisdr": best_sisdr,
+                    "sched": sched.state_dict(), "best_val_loss": best_val_loss,
                     "no_improve": no_improve, "history": history}, ckpt_path)
-        write_metrics(out, base, history, best_sisdr)
+        write_metrics(out, base, history, best_val_loss)
         save_trend(history, out / "trend.png")
 
         si = val["si_sdr"]; pe = val["pesq_wb"]; st = val["stoi"]
+        bv = f"{best_val_loss:+.4f}" if best_val_loss != float("inf") else "na"
         epoch_bar.set_postfix(
+            vloss=f"{vloss:+.4f}" if vloss is not None else "na",
             si_sdr=f"{si:+.2f}" if si is not None else "na",
             pesq=f"{pe:.3f}" if pe is not None else "na",
             stoi=f"{st:.3f}" if st is not None else "na",
-            best=f"{best_sisdr:+.2f}", noimp=f"{no_improve}/{args.early_stop_patience}",
+            best=bv, noimp=f"{no_improve}/{args.early_stop_patience}",
             refresh=True)
         epoch_bar.write(
-            f"ep{ep:02d} | loss {rec['train_loss']:+.4f} lr {rec['lr']:.2e} | "
+            f"ep{ep:02d} | train {rec['train_loss']:+.4f} lr {rec['lr']:.2e} | "
+            f"VAL-LOSS {('%+.4f' % vloss) if vloss is not None else 'na'} "
             f"SI-SDR {('%.2f' % si) if si is not None else 'na'} PESQ "
             f"{('%.3f' % pe) if pe is not None else 'na'} STOI "
-            f"{('%.3f' % st) if st is not None else 'na'} | best {best_sisdr:+.2f} "
+            f"{('%.3f' % st) if st is not None else 'na'} | best-vloss {bv} "
             f"| nan-skip {nan_skips} | {rec['sec']:.0f}s")
 
         sched.step()
         if args.early_stop_patience and no_improve >= args.early_stop_patience:
-            epoch_bar.write(f"[early-stop] no SI-SDR improvement for {no_improve} epochs -> stopping at ep{ep}")
+            epoch_bar.write(f"[early-stop] no val-loss improvement for {no_improve} epochs -> stopping at ep{ep}")
             break
     epoch_bar.close()
 
-    write_metrics(out, {**base, "total_sec": round(time.time() - t_start, 1)}, history, best_sisdr)
+    write_metrics(out, {**base, "total_sec": round(time.time() - t_start, 1)}, history, best_val_loss)
     print(f"\nsaved -> {out}/  (metrics.json, best.pt, checkpoint.pt, trend.png)")
-    print(f"BEST val SI-SDR: {best_sisdr:+.2f} dB | final: {history[-1]['val'] if history else None}")
+    bv = f"{best_val_loss:+.4f}" if best_val_loss != float("inf") else "na"
+    print(f"BEST val total-loss: {bv} | final: {history[-1]['val'] if history else None}")
     return 0
 
 

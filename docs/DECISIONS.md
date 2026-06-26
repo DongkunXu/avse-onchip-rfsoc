@@ -126,6 +126,21 @@ memory ≤ budget + one scene regardless of scene-size distribution. Both are CL
 process over the whole shuffled set (incl. longest scenes) peaks at 823 MB flat; a 6-worker run crosses the
 ep0→1 boundary with no MemoryError. Per-window numerics unchanged. Refines [D-14].
 
+### D-17 ✅ Model selection / early-stop on val TOTAL LOSS, not SI-SDR alone
+**2026-06-26 — owner.** `best.pt` and early-stop tracked **val SI-SDR only**, but SI-SDR is just one term
+(weight 0.5) of the training objective alongside PESQ (3.0), STOI (4.0), L1/L2/multiscale/STFT. That
+mismatch let the run flirt with early-stop on SI-SDR while PESQ/STOI were still improving, and saved a
+`best.pt` that wasn't the all-round best. Fix: select + early-stop on the **validation total loss** (the
+exact training objective on held-out data) — the comprehensive criterion the owner asked for. `evaluate()`
+now also computes the total loss over the val set (skipping non-finite/silent-target batches, D-12);
+SI-SDR/PESQ/STOI are still logged for reporting. **Logic-only change — no retraining**: training dynamics,
+loss, optimizer, data are untouched; only which epoch is "best" and when to stop change. Resume-safe: a
+pre-val-loss checkpoint (only `best_sisdr`) triggers a clean switch — best/early-stop reset and the first
+epoch after resume sets the new baseline (past val-losses were never computed and use different functions
+than the eval metrics, so they're unrecoverable). Verified on GPU: `--quick` end-to-end + a real resume
+from the live ep17 checkpoint (switches, continues at ep18, saves `best_val_loss`). The SI-SDR-best ep16
+weights were backed up to `best_sisdr_ep16.pt` before resume overwrites `best.pt`.
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).

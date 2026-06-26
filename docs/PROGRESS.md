@@ -8,6 +8,22 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-26 — Model selection on val TOTAL LOSS (not SI-SDR alone) ✅
+
+- ✅ `best.pt`/early-stop were tracking **val SI-SDR only** — one term (w=0.5) of a 7-term objective that
+  also weights PESQ (3.0) and STOI (4.0). Switched selection + early-stop to the **validation total loss**
+  (the comprehensive training objective on held-out data), the owner's call (DECISIONS **D-17**).
+  `evaluate()` now computes the val total loss too (NaN-guarded, D-12); SI-SDR/PESQ/STOI still logged.
+- ✅ **Logic-only — no retraining.** Training/loss/optimizer/data unchanged; only the "best" epoch and
+  early-stop trigger change. Resume-safe: the live ep17 checkpoint (old format, `best_sisdr` only) triggers
+  a clean switch — best/early-stop reset, the first epoch after resume sets the new baseline (past
+  val-losses were never computed and can't be recovered).
+- ✅ Verified on GPU: `--quick` end-to-end (VAL-LOSS computed, best by val-loss) **and a real resume from
+  the live ep17 checkpoint** (prints the switch, continues at ep18, saves `best_val_loss`). Backed up the
+  SI-SDR-best ep16 weights (+4.88 dB) to `best_sisdr_ep16.pt` before resume overwrites `best.pt`.
+- Context: the full run reached **best SI-SDR +4.88 dB @ ep16** (≈ the 40k hq run's +4.89) before the
+  earlier commit-limit crash; it can be resumed directly with the new selection in effect.
+
 ## 2026-06-26 — Scene-pool memory fix: bound by BYTES, not scene count ✅
 
 - ⛔→✅ The first full-data run on the new pipeline finished **epoch 0 (SI-SDR +2.21 dB)** then **crashed at
