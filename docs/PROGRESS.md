@@ -8,6 +8,37 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-27 — Full-data run DONE + definitive full-dev evaluation ✅ (quality ≈ reference, fits single-config)
+
+- ✅ **`p2-c7-full` finished** (early-stopped ep23 on val total-loss; best = **ep18**, `best.pt`).
+- ✅ **Definitive full-dev evaluation** (`tools/eval_full_dev.py`, mirrors the reference protocol in
+  `test reference/scripts/evaluate_snr_bins.py`: per-scene sliding windows → per-window STOI/PESQ-WB/SI-SDR,
+  enhanced AND mixed-baseline, scene-weighted over **all 3327 dev scenes**; metric fns byte-identical to the
+  reference; training-consistent per-window 0.8/|mixed| norm = the on-chip deployment norm). Efficient:
+  GPU forward + 16-proc CPU pool → 5 min for 25k windows × 2 metrics (vs ~34 min single-thread).
+
+  | model / anchor | N scenes | SI-SDR dB | PESQ-WB | STOI | working set | single-config fit |
+  |---|---:|---:|---:|---:|---:|:--:|
+  | **C7 full-data (p2-c7-full, ep18)** | 3327 | **5.40** | **1.727** | **0.754** | **0.017 MB** | ✅ |
+  | C7 hq (p2-c7-hq, 40k subset) | 3327 | 4.32 | 1.673 | 0.729 | 0.017 MB | ✅ |
+  | mixed input (baseline) | 3327 | 2.05 | 1.522 | 0.713 | — | — |
+  | *Reference FP32 teacher (cited, REGISTRY)* | 3319 | 3.99 | 1.673 | 0.741 | — | ❌ (teacher) |
+  | *Deployed INT16 ref (cited, REGISTRY)* | 496 | 5.46 | 1.743 | 0.738 | 4.10 MB | ❌ 215% BRAM |
+
+- ✅ **Result, on the most comparable anchor** (FP32 teacher, **same full-dev scale N≈3300**): C7 full-data
+  **beats it on all three** — SI-SDR **+1.41 dB** (5.40 vs 3.99), PESQ **+0.054**, STOI **+0.013** — at
+  **1/240 the working set**, single static config. Vs the deployed-INT16 number (5.46/1.743/0.738) C7 is on
+  par (SI-SDR/PESQ within rounding, STOI higher), but that anchor is a much smaller **N=496** subset so it is
+  indicative, not a controlled head-to-head. Either way the CHARTER's allowance to sacrifice quality
+  substantially was not needed. Full-data training added **+1.08 dB / +0.054 PESQ / +0.025 STOI** over the
+  40k hq run (same protocol). Abs. improvement over noisy input: **+3.35 dB / +0.20 PESQ / +0.04 STOI**.
+- Note: the 200-window training val (~25 scenes) was noisy — it overstated hq (4.89) and understated full
+  (ep18 5.07); the full-dev numbers above are the reliable ones. The two reference anchors (3.99 FP32 vs 5.46
+  INT16) are NOT inconsistent — they are different eval subsets (N=3319 vs N=496); see REGISTRY. Eval outputs
+  are git-ignored (`experiments/**/full_*_eval.json`); reproduce with `tools/eval_full_dev.py --ckpt <best.pt>`.
+- ⏭ Next: export `best.pt` real weights into the HLS weight ROMs (`hls/src/*`) for a quality-accurate
+  deployment + final end-to-end check.
+
 ## 2026-06-26 — Model selection on val TOTAL LOSS (not SI-SDR alone) ✅
 
 - ✅ `best.pt`/early-stop were tracking **val SI-SDR only** — one term (w=0.5) of a 7-term objective that

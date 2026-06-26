@@ -16,7 +16,7 @@ themselves are git-ignored — store a path/pointer, not the blob.
 
 | exp_id | date | candidate / arch | deployable working set | SI-SDR | PESQ-WB | STOI | params | status | notes |
 |---|---|---|---|---|---|---|---|---|---|
-| **p2-c7-full** | — | C7 Conv-TasNet (mask) | 0.017 MB | — | — | — | 308,544 | **PENDING (owner-run)** | full data (315k win), 80 epochs, early-stop 5, NaN-guarded harness. The definitive quality model; export its best.pt into the HLS ROMs after. |
+| **p2-c7-full** | 2026-06-27 | C7 Conv-TasNet (mask) | 0.017 MB | **+5.40** | **1.727** | **0.754** | 308,544 | **done** | full data (315k win), early-stop ep23 on val total-loss, best=ep18. **Metrics are full-dev (3327 scenes, `tools/eval_full_dev.py`)** — beats the FP32 teacher anchor (3.99/1.673/0.741, N=3319) on all three at 1/240 the working set, single-config. Next: export best.pt → HLS ROMs. |
 | p2-c7-hq | 2026-06-25 | C7 Conv-TasNet (mask) | 0.017 MB | **+4.89** (best, ep16) | **1.683** | **0.718** | 308,544 | done | 20ep/40k win, cosine LR; final ep19 +4.79; **> reference FP32 (+3.99)** at 1/240 the working set. Next: full-data run. |
 | p2-c7-r1 | 2026-06-25 | C7 Conv-TasNet (mask) | 0.017 MB | +3.79 | 1.565 | 0.690 | 308,544 | done | 10ep/10k win (first run) |
 | p2-c2-r1 | 2026-06-25 | C2 streaming-TCN (mapping) | 0.033 MB | +1.12 | 1.478 | 0.672 | 343,616 | done | 10ep/10k win; dominated by C7 → masking > direct mapping |
