@@ -8,6 +8,29 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-27 — Phase 3b kickoff: real-weight deployment + deployment-accurate quality 🔄
+
+**Next task started: turn the FP32 quality number into the on-chip int16-deployment number, and wire the
+real weights into HLS.** The Phase-2 result (5.40/1.727/0.754) is FP32 PyTorch; the owner wants the
+*actual* fixed-point (ap_fixed<16,7>) on-chip quality — the number comparable to the reference deployed-INT16
+anchor (5.46/1.743/0.738).
+
+- ✅ **Reconciliation spec** (`hls/DEPLOY_PLAN.md`): pinned the exact deploy compute graph (PyTorch op →
+  deploy math → HLS array) for the whole AVSE (audio core + video encoder), the fixed-point formats, the BN
+  folding formulas, and **every fidelity gap** between the trained model and the current (placeholder, D-9)
+  HLS. Method mirrors Phase 1: build a faithful fixed-point *emulator*, validate it against HLS C-sim, run at
+  scale. Two decoupled deliverables: **A** = the number (Python emulator, no synth), **B** = the silicon
+  (faithful HLS + real ROMs + re-synth).
+- Investigation found real gaps the placeholder fit-check masked (fit was structure-driven, so output
+  correctness was never checked): **G1** encoder latent is **T_LAT=1201**, not 1200; **G2** the HLS decoder
+  has a 16-sample (one-STRIDE) offset vs PyTorch ConvTranspose(pad=16); **G3** the TCN blocks' bn1/bn2 are
+  dropped (must fold into dwconv/out_conv biases); **G5–G8** the video encoder is a cost-proxy (no BN, no
+  residual shortcuts, global-mean-pool instead of AvgPool+feature_proj); **G9** video proj/temporal biases
+  missing. All catalogued in DEPLOY_PLAN with the faithful fix. None hard — all mechanical — but all required
+  for "actual performance" to be real.
+- ⏭ Next: `tools/export_weights.py` (best.pt → fold BN → quantize → npz + c7_weights.hpp), then the
+  fixed-point emulator + full-dev deployment-accurate eval.
+
 ## 2026-06-27 — Full-data run DONE + definitive full-dev evaluation ✅ (quality ≈ reference, fits single-config)
 
 - ✅ **`p2-c7-full` finished** (early-stopped ep23 on val total-loss; best = **ep18**, `best.pt`).
