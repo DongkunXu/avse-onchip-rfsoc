@@ -78,8 +78,8 @@ def main():
 
         b_audio_out.invalidate()
         outputs[i] = np.array(b_audio_out)
-        if (i + 1) % 50 == 0 or i == N - 1:
-            print(f"  {i+1}/{N} | last compute {t_compute[-1]*1e3:.1f} ms")
+        print(f"  {i+1}/{N} | compute {t_compute[-1]:.2f}s | out[min,max]=[{outputs[i].min()},{outputs[i].max()}]",
+              flush=True)
 
     np.savez(args.out, audio_out=outputs)
     print(f"saved {args.out} | mean compute = {np.mean(t_compute)*1e3:.1f} ms/window "

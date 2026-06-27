@@ -106,11 +106,15 @@ static void audio_core(const sample_t *audio_in,
         }
 
     // decoder: ConvTranspose1d(N->1, k=L, stride=STRIDE, pad=STRIDE), accumulate. s = t*STRIDE+k-STRIDE.
+    // NOT pipelined: this is a scatter-accumulate (obuf[s] += with a computed index s); consecutive (n,t)
+    // iterations overlap-add onto the same obuf[s] (stride-16 overlap). Pipelining it is a read-modify-write
+    // hazard that C-sim (sequential) hides but real hardware loses updates on -> periodic corruption every
+    // STRIDE samples (confirmed on-board). Sequential accumulate is exact; cost ~ns vs the latency. A
+    // hazard-free GATHER decoder is the throughput-optimization-phase rewrite (D-19).
     static acc_t obuf[T];
     INIT_O: for (int s = 0; s < T; s++) obuf[s] = 0;
     DEC: for (int n = 0; n < N; n++)
         for (int t = 0; t < T_LAT; t++) {
-#pragma HLS PIPELINE II=2
             data_t wv = w[n][t];
             for (int k = 0; k < L; k++) {
                 int s = t * STRIDE + k - STRIDE;
