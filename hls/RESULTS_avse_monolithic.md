@@ -2,7 +2,41 @@
 
 The whole system — C7 audio mask network **+ the video encoder, in ONE HLS design** (`c7_avse_top`).
 This is the real single-config number the owner asked for (D-10), not the audio+video estimate.
-Target xczu48dr, Vitis HLS 2022.2, placeholder weights.
+Target xczu48dr, Vitis HLS 2022.2.
+
+---
+
+## ✅ REAL-WEIGHT DEPLOYED DESIGN (definitive — Phase 3b)
+
+The trained `p2-c7-full/best.pt` weights, BN-folded into `hls/src/c7_weights.hpp`, with the value-faithful
+HLS (audio core inline bn1/bn2 + corrected decoder offset; faithful video encoder). The computation is
+**HLS-C-sim-validated bit-faithful to the fixed-point emulator** that measured the on-chip quality
+(**SI-SDR 4.984 / PESQ 1.632 / STOI 0.742**, full dev). Video encoder + VPROJ/VUP synthesized in a
+conservative **rolled** schedule (D-19; throughput optimization is a deliberate later phase).
+
+| Resource | csynth | **post-route** | Available | **Util** | (placeholder post-route) |
+|---|---:|---:|---:|---:|---:|
+| **BRAM_18K** | 1603 | **1843** | 2160 | **85.3 %** | 80.3 % |
+| **LUT** | 189,313 | **80,933** | 425,280 | **19.0 %** | 41.4 % |
+| **DSP** | 833 | **720** | 4272 | **16.9 %** | 20.2 % |
+| FF | 53,192 | 41,711 | 850,560 | 4.9 % | 11.8 % |
+| URAM | 0 | 0 | 80 | 0 % | 0 % |
+
+**Timing MET** — post-route CP 4.869 ns < 5.000 ns → **200 MHz**, WNS +0.131 ns. Packaged IP: `export.zip`.
+Latency 2.53 s/window (rolled video dominates — the throughput-optimization target, D-19).
+
+> **The complete AVSE with the REAL trained weights, computation C-sim-validated, fits ONE static FPGA
+> configuration and closes timing: 85 % BRAM, 19 % LUT, 17 % DSP, 200 MHz.** BRAM (the activation/weight
+> wall) is the binding resource at 85 % — ~15 % headroom; real weight ROMs raise it vs the placeholder
+> (80 %), while the rolled video drops LUT (41 % → 19 %). This is the project's central goal, achieved with
+> the actual deployed model on real place-and-route.
+
+---
+
+## Historical: structure-fit proof with placeholder weights (D-9)
+
+Below is the original fit proof (placeholder weights, pipelined video) that established the structure fits
+before the real weights existed. Kept for the record.
 
 ## Whole-system csynth estimate (`c7_avse_top_csynth.rpt`)
 

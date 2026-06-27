@@ -33,11 +33,18 @@ ended.** Investigated honestly (not re-run blindly):
   too, fit-first, D-19.) audio_core 47% BRAM / 14% DSP / 27% LUT (pipelined); video_encoder 22% / 5% / 15%
   (rolled). Latency 2.53 s (rolled video dominates — the deferred throughput-optimization target). Comparable
   to the placeholder csynth (70% BRAM) but now with the REAL trained weights and C-sim-validated computation.
-- ⏭ **B4:** Vivado P&R (`export_design -flow impl`) → definitive post-route numbers + packaged IP, then
-  system integration (Zynq PS + DMA → bitstream) → on-board measurement (the end goal). **Throughput/pipelining
-  optimization of the video is a deliberate LATER step** (owner: full flow + board numbers first, no shortcuts
-  on the computation; then optimize — it also strengthens the circuits narrative). See
-  [[hls-synthesis-and-optimization]] memory.
+- ✅ **B4 DONE — Vivado P&R of the real-weight monolithic: FITS one config, timing MET @ 200 MHz.**
+  `export_design -flow impl` (~33 min, not the feared 2.5 h — the rolled video places fast). **Post-route:
+  BRAM 1843 (85%), LUT 80933 (19%), DSP 720 (17%), FF 41711 (5%); CP 4.869 ns < 5.0 → 200 MHz, WNS
+  +0.131 ns.** Packaged IP `c7_avse/sol1/impl/export.zip`. (Note: the Start-Process wrapper reported "exit 1"
+  but vitis_hls exited cleanly — verified via the impl log "Timing met" + export.zip; a false alarm.)
+  vs placeholder post-route (80% BRAM / 41% LUT): real weight ROMs raise BRAM to 85%, rolled video drops
+  LUT to 19%. **The whole real-weight, C-sim-validated AVSE fits ONE static config, timing-closed.** Full
+  numbers in `hls/RESULTS_avse_monolithic.md`.
+- ⏭ **Next — on-board measurement (the end goal):** system integration around the packaged IP (Zynq PS +
+  AXI-DMA for audio/video I/O → bitstream → RFSoC 4x2), then run test data on the board and measure. Then
+  (separate phase) throughput/pipelining optimization of the video (D-19), which also strengthens the
+  circuits narrative. See [[hls-synthesis-and-optimization]] memory.
 
 ## 2026-06-27 — Phase 3b kickoff: real-weight deployment + deployment-accurate quality 🔄
 
