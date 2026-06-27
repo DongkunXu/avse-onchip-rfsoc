@@ -62,9 +62,15 @@ anchor (5.46/1.743/0.738).
     the window boundaries — confirming G1/G2 are correct and the residual is float-emu-vs-fixed-point
     boundary jitter (≈ ±1 LSB), not a logic bug. So the 4.98 dB emulator number is faithful to silicon to
     within ~0.02 dB.
-- ⏭ **B2:** rewrite `c7_video.hpp` value-faithful (BN folds + residual shortcuts + AvgPool+feature_proj +
-  temporal/proj biases) + `c7_avse_top.cpp`, end-to-end C-sim (`vectors_full.txt`). **B3:** csynth — the
-  resource check for the faithful video encoder (the flagged fit risk). **B4:** Vivado P&R → final numbers.
+- ✅ **B2 DONE: faithful video encoder + end-to-end C-sim.** Rewrote `c7_video.hpp` value-faithful (G5–G8:
+  conv0 BN fold; DWSep depthwise→pointwise+BN+ReLU **+ residual shortcut [1×1 s2 + BN]**, dropped the proxy's
+  extra depthwise ReLU; AvgPool(k5,s1)→2×2 then feature_proj Conv2d(k2)+ReLU; temporal_proj+residual) with
+  real ROMs; `c7_avse_top.cpp` now uses the real video proj (Conv1d+bias, G9) and the correct upsample index
+  (G10). **End-to-end Vitis HLS C-sim PASS** (`tb_avse` + `vectors_full.txt`): the monolithic `c7_avse_top`
+  reproduces the emulator to **rel_rms 0.5–0.85%, max 2–3 data_t LSB** (interior samples) → the whole
+  synthesizable AVSE computes the 4.98 dB number within ~0.02 dB. Emulator ≡ silicon confirmed.
+- ⏭ **B3:** csynth the monolithic — resource check for the faithful video encoder (the flagged fit risk).
+  **B4:** Vivado P&R → the final real-weight fit numbers.
 
 ## 2026-06-27 — Full-data run DONE + definitive full-dev evaluation ✅ (quality ≈ reference, fits single-config)
 

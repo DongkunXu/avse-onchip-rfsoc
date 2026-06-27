@@ -29,17 +29,13 @@ extern "C" void c7_avse_top(
     static data_t video_feat[vid::C][vid::TF];
     video_encoder(video_in, video_feat);
 
-    // ---- project (96->B) per frame, then upsample (30 -> T_LAT) -> video_embed[B*T_LAT] ----
-    static wgt_t Wvproj[vid::C][B];
-    VPINIT: for (int c = 0; c < vid::C; c++)
-        for (int b = 0; b < B; b++) Wvproj[c][b] = (wgt_t)(((c + b) % 11 - 5) * 0.03);
-
+    // ---- project (96->B) per frame (proj Conv1d + bias), then upsample (30 -> T_LAT) ----
     static data_t vproj[B][vid::TF];
     VPROJ: for (int b = 0; b < B; b++)
         for (int fr = 0; fr < vid::TF; fr++) {
 #pragma HLS PIPELINE
-            acc_t a = 0;
-            for (int c = 0; c < vid::C; c++) a += (acc_t)(video_feat[c][fr] * Wvproj[c][b]);
+            acc_t a = (acc_t)wts::vproj_b[b];
+            for (int c = 0; c < vid::C; c++) a += (acc_t)(video_feat[c][fr] * wts::vproj_w[b][c]);
             vproj[b][fr] = (data_t)a;
         }
 
