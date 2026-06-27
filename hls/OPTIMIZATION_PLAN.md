@@ -85,3 +85,14 @@ Work in a **separate** build project (`c7_avse_opt`) so the baseline `c7_avse` s
   nearly halved it. BRAM 72% est (+~14 for fbuf), DSP 19%. On-board: frame now read contiguously
   (LOADF burst) vs CONV0's old strided per-pixel DDR reads. TODO: bump `max_read_burst_length`.
   Next: O-2a (unroll CONV0 kernel → II≈1).
+- _(2026-06-27)_ **O-2a done** (unroll CONV0 7×7 kernel). C-sim PASS (rel_rms 8.54e-3, unchanged).
+  fbuf→2D partitioned cyclic 7×7 (49 banks); conv0 weights staged to a fully-partitioned local
+  buffer; ox loop pipelined II=1 with the kernel unrolled. **CONV0 II 25→1**: 3.686M → 0.147M
+  cyc/frame. Total **406.96M → 300.79M cyc (2.035 → 1.504 s)**, −41% vs baseline. BRAM 74% (+35),
+  DSP 22% (+135). Pointwise/shortcut convs now 72% of the whole design (216.5M) → O-2b is next.
+- **O-2b approach (decided):** partition the reduction-input activation buffers (dw, b0, b1, b2) on
+  the *channel* dim (cyclic factor 16, keeps BRAM ~flat — complete would double it via bank rounding);
+  load each output channel's weight *row* into a complete-partitioned register array (LUT/FF, cheap)
+  and unroll the channel reduction → II≈4 (Cin 64) / 6 (Cin 96). Channel→bank, spatial→address makes
+  the strided shortcut reads conflict-free (the original 6 h blow-up was strided-into-spatial +
+  complete-partitioned big ROMs — both avoided). Do PW loops first, then the strided SC loops.

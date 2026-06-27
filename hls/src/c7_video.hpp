@@ -30,7 +30,12 @@ static void video_encoder(const data_t *video_in, data_t video_feat[vid::C][vid:
     using namespace vid;
 
     // per-frame buffers (reused across 30 frames)
-    static data_t fbuf[IN * IN];     // O-1: on-chip cache of the current 96x96 frame (one DDR burst)
+    static data_t fbuf[IN][IN];      // O-1/O-2a: on-chip frame cache, partitioned 7x7 for the conv0 window
+#pragma HLS ARRAY_PARTITION variable=fbuf dim=1 cyclic factor=7
+#pragma HLS ARRAY_PARTITION variable=fbuf dim=2 cyclic factor=7
+    static wgt_t  c0w[C0][7][7];     // O-2a: conv0 weights staged so the unrolled 7x7 kernel reads 49/clk
+#pragma HLS ARRAY_PARTITION variable=c0w dim=2 complete
+#pragma HLS ARRAY_PARTITION variable=c0w dim=3 complete
     static data_t b0[C0][S0 * S0];   // conv0 out  [64][2304]
     static data_t dw[C][S1 * S1];    // depthwise scratch (max [96][576])
     static data_t main_[C][S1 * S1]; // pointwise+relu main (max [96][576])
@@ -47,26 +52,43 @@ static void video_encoder(const data_t *video_in, data_t video_feat[vid::C][vid:
     // of the video path for real-time throughput is a deliberate SEPARATE optimization step (DEPLOY_PLAN),
     // not part of getting the end-to-end flow to bitstream.
 
+    // O-2a: stage the conv0 weights once into a fully-partitioned local buffer so the unrolled 7x7
+    // kernel can read all 49 taps in parallel (the namespace ROM wts::v_c0_w can't take a partition
+    // pragma here). One-time copy, amortized over 30 frames.
+    LDW0: for (int co = 0; co < C0; co++)
+        for (int ky = 0; ky < 7; ky++)
+            for (int kx = 0; kx < 7; kx++) {
+#pragma HLS PIPELINE II=1
+                c0w[co][ky][kx] = wts::v_c0_w[co][ky][kx];
+            }
+
     FRAMES: for (int f = 0; f < TF; f++) {
         const data_t *img = video_in + f * IN * IN;
 
         // ---- O-1: burst-cache this frame on-chip (one contiguous 96x96 DDR read) so the conv reads
         // hit BRAM instead of issuing per-element DDR round-trips (the on-board 4.55x penalty). The
         // values are identical; only the memory staging changes.
-        LOADF: for (int i = 0; i < IN * IN; i++) {
+        LOADF: for (int y = 0; y < IN; y++)
+            for (int x = 0; x < IN; x++) {
 #pragma HLS PIPELINE II=1
-            fbuf[i] = img[i];
-        }
+                fbuf[y][x] = img[y * IN + x];
+            }
 
         // ---- conv0: Conv2d(1->64,k7,s2,p3) + BN(folded) + ReLU ----
+        // O-2a: pipeline the spatial loop at II=1 with the 7x7 kernel reduction fully unrolled
+        // (49 parallel MACs). fbuf is partitioned 7x7 (49 banks) and c0w is fully partitioned, so the
+        // 49 input reads + 49 weight reads all land in distinct banks each cycle.
         CONV0: for (int co = 0; co < C0; co++)
             for (int oy = 0; oy < S0; oy++)
-                for (int ox = 0; ox < S0; ox++) {                    acc_t a = (acc_t)wts::v_c0_b[co];
+                for (int ox = 0; ox < S0; ox++) {
+#pragma HLS PIPELINE II=1
+                    acc_t a = (acc_t)wts::v_c0_b[co];
                     for (int ky = 0; ky < 7; ky++)
                         for (int kx = 0; kx < 7; kx++) {
+#pragma HLS UNROLL
                             int iy = oy * 2 - 3 + ky, ix = ox * 2 - 3 + kx;
-                            data_t v = (iy >= 0 && iy < IN && ix >= 0 && ix < IN) ? fbuf[iy * IN + ix] : (data_t)0;
-                            a += (acc_t)(v * wts::v_c0_w[co][ky][kx]);
+                            data_t v = (iy >= 0 && iy < IN && ix >= 0 && ix < IN) ? fbuf[iy][ix] : (data_t)0;
+                            a += (acc_t)(v * c0w[co][ky][kx]);
                         }
                     b0[co][oy * S0 + ox] = vrelu(a);
                 }
