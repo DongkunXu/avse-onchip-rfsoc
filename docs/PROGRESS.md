@@ -41,10 +41,22 @@ ended.** Investigated honestly (not re-run blindly):
   vs placeholder post-route (80% BRAM / 41% LUT): real weight ROMs raise BRAM to 85%, rolled video drops
   LUT to 19%. **The whole real-weight, C-sim-validated AVSE fits ONE static config, timing-closed.** Full
   numbers in `hls/RESULTS_avse_monolithic.md`.
-- ⏭ **Next — on-board measurement (the end goal):** system integration around the packaged IP (Zynq PS +
-  AXI-DMA for audio/video I/O → bitstream → RFSoC 4x2), then run test data on the board and measure. Then
-  (separate phase) throughput/pipelining optimization of the video (D-19), which also strengthens the
-  circuits narrative. See [[hls-synthesis-and-optimization]] memory.
+- 🔄 **On-board flow STARTED (owner: board is PYNQ-ready, I drive it):**
+  - ✅ Static single-config **block design built + validated** (`hw/tcl/01_build_bd.tcl`): zynq_ultra_ps_e
+    (RFSoC 4x2 board preset) + SmartConnects — PS HPM0 → IP `s_axi_control`; IP's 3× m_axi (gmem0/1/2,
+    audio_in/video_in/audio_out) → HP0 → DDR. (Used the reference `UNet-AVSE-Vitis/dfx` static-BD flow as a
+    guide — single static config, not its 4-PCAP DFX.) License: `XILINXD_LICENSE_FILE` →
+    `G:/phD_Projects/LICENSE_FOR_ISE_VIVADO.lic`.
+  - 🔄 Bitstream build RUNNING (`hw/tcl/02_build_bitstream.tcl`, detached) → exports PYNQ overlay
+    `hw/overlay/avse_sys.{bit,hwh}`.
+  - ✅ Board scripts ready + prep validated: `hw/board/run_fpga.py` (board-side PYNQ driver — Overlay,
+    allocate, write the 3 buffer phys-addrs to regs 0x10/0x1c/0x28, ap_start→poll ap_done),
+    `tools/prep_board_windows.py` (PC: dev windows → int16 matching the emulator; verified ranges
+    audio_in ±26214, video_in [0,405]), `tools/score_board.py` (quality + silicon-vs-emulator check).
+    Subset run (~2.5 s/window) confirms silicon reproduces the C-sim-validated 4.98 dB output.
+- ⏭ When the bitstream is done: deploy overlay + run_fpga to the board, run the prepped windows, score on PC
+  (confirm on-silicon quality). Then (separate phase) throughput/pipelining optimization of the video
+  (D-19). See [[hls-synthesis-and-optimization]] memory.
 
 ## 2026-06-27 — Phase 3b kickoff: real-weight deployment + deployment-accurate quality 🔄
 
