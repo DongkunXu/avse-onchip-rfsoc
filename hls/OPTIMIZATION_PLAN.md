@@ -109,3 +109,10 @@ Work in a **separate** build project (`c7_avse_opt`) so the baseline `c7_avse` s
 - **O-3 target:** audio_core 69.5M = 0.347 s, now the bottleneck. BLOCKS (10 TCN) = 52.3M; within it
   IN1x1 (II=16) + OUT1x1 (II=32) dominate. Raise partition on y/h/hd + unroll the B/H reductions
   (same channel-partition + register-weight recipe), guard BRAM (~88% post-route est after O-2b).
+- _(2026-06-27)_ **O-3a done** (IN1x1 + OUT1x1, standalone audio synth ~5 min). C-sim PASS (rel_rms
+  6.06e-3). y/h/hd partitioned cyclic-16; weight rows → registers; reductions unrolled. IN1x1 II
+  16→**4** (24.6M→6.3M), OUT1x1 II 32→**8** (24.6M→6.3M). **Bonus:** MASK auto-improved II 16→2
+  (2.46M→0.31M) from the richer y ports. **audio_core 69.5M → 30.7M cyc (0.347 → 0.154 s).** BRAM 49%
+  standalone (+~72), DSP 13%. Remaining audio: DEC 7.38M (rolled), ENC 4.92M (II=32), BLOCKS 15.6M.
+  NOTE: BRAM is the watch item — audio partition added ~72; monolith post-route est now ~91%. Track
+  it; dial back the least-valuable partition if integration nears 100%.

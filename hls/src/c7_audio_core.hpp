@@ -34,10 +34,12 @@ static void audio_core(const sample_t *audio_in,
     static data_t y [B][T_LAT];     // TCN state (in-place residual)
     static data_t h [H][T_LAT];     // in_conv output (post bn1)
     static data_t hd[H][T_LAT];     // dwconv output (post bn2)
+// O-3: partition the channel dim (the reduction axis) cyclic-16 so the 1x1 channel reductions
+// (IN1x1 over y, OUT1x1 over hd) read 16/cycle with the channel reduction unrolled (II=4/8).
 #pragma HLS ARRAY_PARTITION variable=w  dim=1 cyclic factor=2
-#pragma HLS ARRAY_PARTITION variable=y  dim=1 cyclic factor=2
-#pragma HLS ARRAY_PARTITION variable=h  dim=1 cyclic factor=2
-#pragma HLS ARRAY_PARTITION variable=hd dim=1 cyclic factor=2
+#pragma HLS ARRAY_PARTITION variable=y  dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=h  dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=hd dim=1 cyclic factor=16
 
     // encoder: Conv1d(1->N, k=L, stride=STRIDE, pad=STRIDE)
     ENC: for (int n = 0; n < N; n++)
@@ -67,14 +69,21 @@ static void audio_core(const sample_t *audio_in,
     // 10 dilated dwsep TCN blocks (residual). PReLU in acc_t, then bn affine, then one data_t cast.
     BLOCKS: for (int blk = 0; blk < NBLK; blk++) {
         int dil = 1 << (blk % X);
-        IN1x1: for (int hh = 0; hh < H; hh++)
+        IN1x1: for (int hh = 0; hh < H; hh++) {
+            wgt_t wr[B];                                // O-3: weight row -> regs, unroll b (II=4)
+#pragma HLS ARRAY_PARTITION variable=wr complete
+            for (int b = 0; b < B; b++) wr[b] = wts::Win[blk][b][hh];
             for (int t = 0; t < T_LAT; t++) {
-#pragma HLS PIPELINE II=2
+#pragma HLS PIPELINE II=4
                 acc_t a = 0;
-                for (int b = 0; b < B; b++) a += (acc_t)(y[b][t] * wts::Win[blk][b][hh]);
+                for (int b = 0; b < B; b++) {
+#pragma HLS UNROLL
+                    a += (acc_t)(y[b][t] * wr[b]);
+                }
                 acc_t p = (a >= 0) ? a : (acc_t)(wts::pr1[blk][hh] * a);
                 h[hh][t] = (data_t)(wts::bn1_s[blk][hh] * p + wts::bn1_b[blk][hh]);
             }
+        }
         DW: for (int hh = 0; hh < H; hh++)
             for (int t = 0; t < T_LAT; t++) {
 #pragma HLS PIPELINE II=2
@@ -87,13 +96,20 @@ static void audio_core(const sample_t *audio_in,
                 acc_t p = (a >= 0) ? a : (acc_t)(wts::pr2[blk][hh] * a);
                 hd[hh][t] = (data_t)(wts::bn2_s[blk][hh] * p + wts::bn2_b[blk][hh]);
             }
-        OUT1x1: for (int b = 0; b < B; b++)
+        OUT1x1: for (int b = 0; b < B; b++) {
+            wgt_t wr[H];                                // O-3: weight row -> regs, unroll hh (II=8)
+#pragma HLS ARRAY_PARTITION variable=wr complete
+            for (int hh = 0; hh < H; hh++) wr[hh] = wts::Wout[blk][hh][b];
             for (int t = 0; t < T_LAT; t++) {
-#pragma HLS PIPELINE II=2
+#pragma HLS PIPELINE II=8
                 acc_t a = 0;
-                for (int hh = 0; hh < H; hh++) a += (acc_t)(hd[hh][t] * wts::Wout[blk][hh][b]);
+                for (int hh = 0; hh < H; hh++) {
+#pragma HLS UNROLL
+                    a += (acc_t)(hd[hh][t] * wr[hh]);
+                }
                 y[b][t] = (data_t)((acc_t)y[b][t] + a);
             }
+        }
     }
 
     // mask + apply (overwrite w with w*mask)
