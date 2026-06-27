@@ -27,10 +27,16 @@ ended.** Investigated honestly (not re-run blindly):
   identical (C-sim still valid), low resource, synthesizes in **~5 min**: standalone video (rolled, real
   weights) = **BRAM 489 (22%), DSP 226 (5%), LUT 69391 (16%)**, latency 2.2 s (slow — that is the deferred
   throughput-optimization target, owner-directed). Diagnostic standalone top: `c7_video_top.cpp`.
-- 🔄 Monolithic `c7_avse_top` csynth (pipelined audio + rolled video) RUNNING — the real single-config total.
-- ⏭ Then Vivado P&R → bitstream → on-board measurement (the current end goal). **Throughput/pipelining
-  optimization of the video is a deliberate LATER step** (owner: get the full flow + board numbers first,
-  no shortcuts on the computation; then optimize — it also strengthens the circuits narrative). See
+- ✅ **Monolithic `c7_avse_top` csynth DONE (real weights) — WHOLE AVSE FITS one static config:**
+  **BRAM 1603 (74%), DSP 833 (19%), LUT 189313 (44%)**, ~9 min synth. (First pass was 87% BRAM; a trivial
+  over-pipelined `VPROJ` had auto-complete-partitioned `video_feat` into 96 banks for +13% BRAM — rolled it
+  too, fit-first, D-19.) audio_core 47% BRAM / 14% DSP / 27% LUT (pipelined); video_encoder 22% / 5% / 15%
+  (rolled). Latency 2.53 s (rolled video dominates — the deferred throughput-optimization target). Comparable
+  to the placeholder csynth (70% BRAM) but now with the REAL trained weights and C-sim-validated computation.
+- ⏭ **B4:** Vivado P&R (`export_design -flow impl`) → definitive post-route numbers + packaged IP, then
+  system integration (Zynq PS + DMA → bitstream) → on-board measurement (the end goal). **Throughput/pipelining
+  optimization of the video is a deliberate LATER step** (owner: full flow + board numbers first, no shortcuts
+  on the computation; then optimize — it also strengthens the circuits narrative). See
   [[hls-synthesis-and-optimization]] memory.
 
 ## 2026-06-27 — Phase 3b kickoff: real-weight deployment + deployment-accurate quality 🔄
