@@ -54,9 +54,22 @@ ended.** Investigated honestly (not re-run blindly):
     `tools/prep_board_windows.py` (PC: dev windows → int16 matching the emulator; verified ranges
     audio_in ±26214, video_in [0,405]), `tools/score_board.py` (quality + silicon-vs-emulator check).
     Subset run (~2.5 s/window) confirms silicon reproduces the C-sim-validated 4.98 dB output.
-- ⏭ When the bitstream is done: deploy overlay + run_fpga to the board, run the prepped windows, score on PC
-  (confirm on-silicon quality). Then (separate phase) throughput/pipelining optimization of the video
-  (D-19). See [[hls-synthesis-and-optimization]] memory.
+- ✅ **First on-board run — single-config bitstream RUNS on real RFSoC 4x2** (PYNQ 3.0.1, aarch64): overlay
+  loads in 2.3 s, IP runs, 16 windows complete, ap_done OK, zero-in→zero-out correct. The whole AVSE runs in
+  ONE static bitstream on real silicon. Board access via plink/pscp (`-hostkey`), `/home/xilinx/avse_onchip/`.
+- ⛔→✅ **Found + fixed a real hardware bug the C-sim could not catch.** Real data gave SI-SDR **−13 dB**
+  (worse than mixed) with **periodic corruption every STRIDE=16 samples**; silicon ≠ emulator (rms_diff ≈
+  signal). Root-caused to the **decoder scatter-accumulate** (`obuf[s] += ` with a computed index): pipelining
+  the overlap-add (consecutive (n,t) hit the same `obuf[s]`) is a read-modify-write hazard that sequential
+  C-sim hides but real hardware loses updates on. **Fix: roll the DEC loop** (sequential = exact; hazard-free
+  GATHER decoder deferred to the optimization phase). All other loops are write-once gathers (unaffected).
+  Re-csynth (rolled decoder): 72% BRAM / 19% DSP / 44% LUT. 🔄 bitstream rebuild running.
+- Note: measured on-board compute = **11.67 s/window** (not the 2.5 s csynth estimate) — the rolled video
+  reads `video_in` element-by-element from DDR with no bursting; this is the prime throughput-optimization
+  target (D-19), to tackle after the corrected end-to-end run is confirmed.
+- ⏭ When the rebuilt bitstream is done: redeploy + re-run the 16 windows → confirm silicon ≡ emulator (the
+  4.98 dB on real hardware). Then (separate phase) throughput optimization (D-19). See
+  [[hls-synthesis-and-optimization]] memory.
 
 ## 2026-06-27 — Phase 3b kickoff: real-weight deployment + deployment-accurate quality 🔄
 
