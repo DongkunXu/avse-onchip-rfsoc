@@ -49,9 +49,22 @@ anchor (5.46/1.743/0.738).
   config** — still **beating the FP32 teacher anchor** (3.99/1.673/0.741) on SI-SDR (+0.99) and STOI, at
   1/240 the working set. int16 quantization costs −0.33 dB; the cheap HW **hardsigmoid mask adds only
   −0.085 dB** (good HW story). Below the deployed-INT16 reference (5.46, but N=496 subset).
-- ⏭ **Deliverable B (silicon):** make the HLS value-faithful (G1–G11 in DEPLOY_PLAN: T_LAT=1201, decoder
-  offset, inline bn1/bn2, faithful video encoder, biases), load real ROMs, C-sim a few windows to prove
-  **emulator ≡ HLS**, then re-run csynth + P&R for the final real-weight fit numbers.
+- 🔄 **Deliverable B (silicon) — B1 DONE: audio core value-faithful + C-sim validated.**
+  - `tools/gen_hls_weights.py` → `hls/src/c7_weights.hpp` (real ROMs: `wgt_t` MAC operands, `bn_t`=ap_fixed
+    <32,16> for inline BN/in_norm affine & PReLU & folded biases). Added `bn_t` to `c7_types.hpp`; set
+    **T_LAT=1201** (G1).
+  - Rewrote `c7_audio_core.hpp` value-faithful: real ROMs, inline bn1/bn2 (PReLU in acc_t → one data_t cast,
+    matches the emulator), **fixed the decoder offset** `s=t·STRIDE+k−STRIDE` (G2). Fixed the monolithic
+    upsample index (G10).
+  - `tools/dump_hls_vectors.py` (golden vectors from the emulator) + `hls/tb/tb_audio_core.cpp` +
+    `run_csim_audio.tcl`. **Vitis HLS C-sim PASS**: HLS `c7_audio_top` reproduces the emulator to
+    **rel_rms 0.3–0.6%, max ~1.5 data_t LSB**; the max-diff samples are interior (i=17228, i=5678), not at
+    the window boundaries — confirming G1/G2 are correct and the residual is float-emu-vs-fixed-point
+    boundary jitter (≈ ±1 LSB), not a logic bug. So the 4.98 dB emulator number is faithful to silicon to
+    within ~0.02 dB.
+- ⏭ **B2:** rewrite `c7_video.hpp` value-faithful (BN folds + residual shortcuts + AvgPool+feature_proj +
+  temporal/proj biases) + `c7_avse_top.cpp`, end-to-end C-sim (`vectors_full.txt`). **B3:** csynth — the
+  resource check for the faithful video encoder (the flagged fit risk). **B4:** Vivado P&R → final numbers.
 
 ## 2026-06-27 — Full-data run DONE + definitive full-dev evaluation ✅ (quality ≈ reference, fits single-config)
 

@@ -15,7 +15,7 @@ extern "C" void c7_audio_top(
     sample_t       *audio_out)    // [T]
 {
 #pragma HLS INTERFACE m_axi port=audio_in    offset=slave bundle=gmem0 depth=19200
-#pragma HLS INTERFACE m_axi port=video_embed offset=slave bundle=gmem1 depth=76800
+#pragma HLS INTERFACE m_axi port=video_embed offset=slave bundle=gmem1 depth=76864
 #pragma HLS INTERFACE m_axi port=audio_out   offset=slave bundle=gmem2 depth=19200
 #pragma HLS INTERFACE s_axilite port=audio_in    bundle=control
 #pragma HLS INTERFACE s_axilite port=video_embed bundle=control

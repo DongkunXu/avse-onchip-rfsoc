@@ -44,11 +44,10 @@ extern "C" void c7_avse_top(
         }
 
     static data_t video_embed[B * T_LAT];
-    const int up = T_LAT / vid::TF;             // 1200 / 30 = 40
-    VUP: for (int b = 0; b < B; b++)
+    VUP: for (int b = 0; b < B; b++)            // nearest upsample TF->T_LAT: frame = floor(t*TF/T_LAT)
         for (int t = 0; t < T_LAT; t++) {
 #pragma HLS PIPELINE
-            video_embed[b * T_LAT + t] = vproj[b][t / up];
+            video_embed[b * T_LAT + t] = vproj[b][(t * vid::TF) / T_LAT];
         }
 
     // ---- C7 audio mask network (shared core) ----

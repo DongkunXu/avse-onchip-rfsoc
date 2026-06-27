@@ -35,6 +35,9 @@ experiments/**/full_*_eval.json
 # deployment-accurate eval outputs + exported deploy weights (regenerate: export_weights.py + eval_deploy.py)
 experiments/**/deploy_*_eval*.json
 *.npz
+# generated HLS weight ROM (4 MB; regenerate: gen_hls_weights.py) + golden C-sim vectors (dump_hls_vectors.py)
+hls/src/c7_weights.hpp
+hls/tb/vectors_*.txt
 
 # ── Datasets / large binaries (live outside the repo: D:\DataSet\LRS3) ───
 data_cache/
