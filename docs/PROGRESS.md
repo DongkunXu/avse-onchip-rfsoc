@@ -28,8 +28,30 @@ anchor (5.46/1.743/0.738).
   residual shortcuts, global-mean-pool instead of AvgPool+feature_proj); **G9** video proj/temporal biases
   missing. All catalogued in DEPLOY_PLAN with the faithful fix. None hard — all mechanical — but all required
   for "actual performance" to be real.
-- ⏭ Next: `tools/export_weights.py` (best.pt → fold BN → quantize → npz + c7_weights.hpp), then the
-  fixed-point emulator + full-dev deployment-accurate eval.
+- ✅ **Deliverable A DONE — the deployment-accurate quality number.**
+  - `tools/export_weights.py`: best.pt → fold every foldable BN (video convs; in_norm/bn1/bn2 kept inline to
+    respect the zero-pad boundary) → one weight truth source `deploy_weights.npz`. BN-fold unit checks PASS.
+    Surfaced a real range fact: `in_norm` scale reaches ~102 (low-variance channels) — would overflow
+    `wgt_t<16,5>`; resolved by keeping inline affines high-precision (DECISIONS **D-18**).
+  - `tools/c7_fixedpoint.py`: bit-faithful fixed-point emulator (video encoder + audio core) from the npz,
+    `precision={fp,int16} × mask={sigmoid,hardsigmoid}`. **Correctness gate PASS**: emulator fp+sigmoid ≡
+    PyTorch best.pt (max|Δ|=4.4e-4, ref rms 6.7e-2; each component verified ≤1e-5).
+  - `tools/eval_deploy.py`: same protocol as `eval_full_dev`, forward = emulator. **Chain validated**:
+    fp+sigmoid full-dev = **5.399/1.727/0.754**, reproduces the committed PyTorch number to 3 decimals.
+
+  | full-dev (3327 scenes) | SI-SDR | PESQ-WB | STOI | Δ vs FP32 |
+  |---|---:|---:|---:|---|
+  | FP32 (sigmoid) | 5.399 | 1.727 | 0.754 | — |
+  | int16 (sigmoid) | 5.069 | 1.634 | 0.746 | quant −0.330 dB |
+  | **int16 + hardsigmoid (on-chip deploy)** | **4.984** | **1.632** | **0.742** | **−0.415 dB** total |
+
+  **The on-chip int16 C7 AVSE delivers 4.98 dB SI-SDR / 1.63 PESQ / 0.742 STOI on full dev, single static
+  config** — still **beating the FP32 teacher anchor** (3.99/1.673/0.741) on SI-SDR (+0.99) and STOI, at
+  1/240 the working set. int16 quantization costs −0.33 dB; the cheap HW **hardsigmoid mask adds only
+  −0.085 dB** (good HW story). Below the deployed-INT16 reference (5.46, but N=496 subset).
+- ⏭ **Deliverable B (silicon):** make the HLS value-faithful (G1–G11 in DEPLOY_PLAN: T_LAT=1201, decoder
+  offset, inline bn1/bn2, faithful video encoder, biases), load real ROMs, C-sim a few windows to prove
+  **emulator ≡ HLS**, then re-run csynth + P&R for the final real-weight fit numbers.
 
 ## 2026-06-27 — Full-data run DONE + definitive full-dev evaluation ✅ (quality ≈ reference, fits single-config)
 

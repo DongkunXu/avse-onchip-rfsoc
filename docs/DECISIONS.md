@@ -141,6 +141,22 @@ than the eval metrics, so they're unrecoverable). Verified on GPU: `--quick` end
 from the live ep17 checkpoint (switches, continues at ep18, saves `best_val_loss`). The SI-SDR-best ep16
 weights were backed up to `best_sisdr_ep16.pt` before resume overwrites `best.pt`.
 
+### D-18 ✅ Deployment fixed-point policy: int16 activation/weight datapath; BN/PReLU scalars high-precision
+**2026-06-27.** For the deployment-accurate quality measurement (and the matching HLS), the int16 lock
+(D-3) is applied where it belongs — the **BRAM-dominating datapath**: activations → `data_t` ap_fixed<16,7>,
+MAC weight operands → `wgt_t` ap_fixed<16,5>, I/O PCM → `sample_t` ap_fixed<16,1>, accumulators wide
+(`acc_t` ap_fixed<48,22>, treated exact). The **inline per-channel BN/in_norm affine (s,b) and PReLU slopes
+are kept high-precision constants**, NOT forced into `wgt_t`. Reason (found, not assumed): exporting the real
+weights showed `in_norm`'s fold scale reaches **~102** (low-variance encoder channels) and `bn2` scales reach
+~45 — both overflow `wgt_t`'s ±16 range; and these are pointwise constants, not the systolic-array operands
+the int16 lock targets (standard practice, cf. TFLite per-channel scales). Measured cost of the policy
+(full dev, `tools/eval_deploy.py`): pure int16 quantization −0.330 dB SI-SDR; the HW hardsigmoid mask adds
+only −0.085 dB → on-chip **4.984 / 1.632 / 0.742**, still above the FP32 teacher anchor on SI-SDR/STOI. The
+emulator (`tools/c7_fixedpoint.py`) and the HLS ROMs both consume the one exported `deploy_weights.npz`, so
+they cannot drift; HLS C-sim will cross-check emulator ≡ silicon (Deliverable B). Related: bn1/bn2 are kept
+**inline** rather than folded into the dwconv/out_conv because PyTorch zero-pads the bn1 output before the
+dwconv — folding to a single per-channel bias would mis-handle the pad boundary (see `hls/DEPLOY_PLAN.md`).
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).
@@ -148,5 +164,7 @@ weights were backed up to `best_sisdr_ep16.pt` before resume overwrites `best.pt
 - ~~after Phase 2: pick the operating point~~ → resolved (D-9: **C7**; Pareto confirmed C7 dominant).
 - ~~after Phase 3 fit: monolithic total then retrain~~ → resolved (D-10: monolithic P&R done, 80% BRAM
   one config; high-quality retrain in progress).
-- **◇ OPEN**: owner launches the **full-data C7 run** (`p2-c7-full`); then export `best.pt` real weights
-  into the HLS ROMs and re-run the HLS flow for the quality-accurate deployment + final eval.
+- ~~full-data run + deployment-accurate quality~~ → resolved (`p2-c7-full` 5.40 FP32; D-18: on-chip int16
+  **4.98 dB / 1.63 / 0.742**, validated emulator). **Deliverable A done.**
+- **◇ OPEN (Deliverable B)**: make the HLS value-faithful (DEPLOY_PLAN G1–G11) + load the real weight ROMs,
+  C-sim to confirm **emulator ≡ HLS**, then re-run csynth + P&R for the final real-weight fit numbers.

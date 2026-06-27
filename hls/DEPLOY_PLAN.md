@@ -57,14 +57,20 @@ Channels: N=128 (enc/latent), B=64 (bottleneck), H=128 (TCN), NBLK=10, KD=3, L=3
    `wn = bn_s[n]·w[n] + bn_b[n]` (in_norm applied inline, exact), `y[b] = Σ_n wn·Wbn[n][b] + video_embed[b]`.
    `bn_s[n]=γ/√(σ²+ε)`, `bn_b[n]=β−bn_s·μ` (from `in_norm`), `Wbn[n][b]=bottleneck.weight[b,n,0]`.
 3. **10 dilated dwsep TCN blocks** (residual), block i, dil=2^(i mod 5):
-   - IN1x1: `h[c] = prelu(Σ_b y[b]·Win[i][b][c], pr1[i][c])`, `Win[i][b][c]=tcn.i.in_conv.weight[c,b,0]`,
-     `pr1=tcn.i.prelu1.weight`. (h = prelu1(in_conv(y)), **pre-bn1**.)
-   - DW: `hd[c] = prelu(Σ_j h[c][t−(KD−1−j)·dil]·Wdw[i][c][j] + bdw[i][c], pr2[i][c])`.
-     **bn1 folded into dwconv**: `Wdw[i][c][j]=tcn.i.dwconv.weight[c,0,j]·s1[c]`,
-     `bdw[i][c]=b1[c]·Σ_j tcn.i.dwconv.weight[c,0,j]`, with `s1,b1` from `bn1`. `pr2=tcn.i.prelu2.weight`.
-   - OUT1x1: `y[b] += Σ_c hd[c]·Wout[i][c][b] + bout[i][b]`.
-     **bn2 folded into out_conv**: `Wout[i][c][b]=tcn.i.out_conv.weight[b,c,0]·s2[c]`,
-     `bout[i][b]=Σ_c tcn.i.out_conv.weight[b,c,0]·b2[c]`, `s2,b2` from `bn2`.
+   - IN1x1: `h[c] = bn1( prelu(Σ_b y[b]·Win[i][b][c], pr1[i][c]) )` quant `data_t`.
+     `Win[i][b][c]=tcn.i.in_conv.weight[c,b,0]`, `pr1=tcn.i.prelu1.weight`. **bn1 kept inline** (per-channel
+     affine `bn1_s[c]·x+bn1_b[c]`, like in_norm), NOT folded — see note below.
+   - DW: `hd[c] = bn2( prelu(Σ_j h[c][t−(KD−1−j)·dil]·Wdw[i][c][j], pr2[i][c]) )` quant `data_t`.
+     `Wdw[i][c][j]=tcn.i.dwconv.weight[c,0,j]`, `pr2=tcn.i.prelu2.weight`, bn2 inline. (h zero-padded on the
+     left for `tt<0`.)
+   - OUT1x1: `y[b] += Σ_c hd[c]·Wout[i][c][b]`, `Wout[i][c][b]=tcn.i.out_conv.weight[b,c,0]`.
+
+   > **Why bn1/bn2 are inline, not folded:** PyTorch left-pads the bn1 *output* with **zeros**
+   > (`F.pad(bn1(...), (pad,0))`), so the padded taps carry 0, not `bn1(0)=bn1_b`. Folding bn1 into the
+   > dwconv as a single per-channel bias would add `bn1_b·Σ(taps)` at every output, wrong by the pad
+   > contribution on the first `(KD−1)·dil` columns of each block. Applying bn1/bn2 as an explicit
+   > per-channel affine on the stored `data_t` buffer (then zero-padding) is exact and costs the same as the
+   > already-inline in_norm. `bn_s=γ/√(σ²+ε)`, `bn_b=β−bn_s·μ`, ε=1e-5.
 4. **mask** `Wmask[b][n]=mask_conv.weight[n,b,0]`: `w[n] = w[n]·hardsigmoid(Σ_b y[b]·Wmask[b][n])`.
    `hardsigmoid(x)=clamp(0.2x+0.5,0,1)`.
 5. **decoder** `ConvTranspose1d(N→1,k=L,s=STRIDE,pad=STRIDE,bias=False)`:
@@ -86,7 +92,7 @@ bias; quantize each conv/BN/ReLU output to `data_t`.
 |---|---|---|---|
 | G1 | latent length | `T_LAT=1200` | **1201** (enc/dec/buffers/loops) |
 | G2 | decoder offset | `s=t·STRIDE+k` (16-sample shift) | `s=t·STRIDE+k−STRIDE` |
-| G3 | TCN bn1/bn2 | dropped | fold → `bdw[i][H]`, `bout[i][B]` biases (new ROMs) |
+| G3 | TCN bn1/bn2 | dropped | keep **inline** per-channel affine `bn1_s/b[H]`, `bn2_s/b[H]` (not folded — zero-pad boundary) |
 | G4 | mask | hardsigmoid (keep) | keep; report sigmoid sensitivity |
 | G5 | video conv0 BN | none | fold into conv0 bias |
 | G6 | DWSep BN+shortcut | none, extra post-depthwise ReLU | depthwise(no relu)→pointwise→fold-BN→ReLU→+shortcut(1×1 s2 + fold-BN) |

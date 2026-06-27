@@ -32,6 +32,9 @@ tensorboard/
 experiments/**/run.log*
 # full-split evaluation outputs (large per-scene dumps; regenerate with tools/eval_full_dev.py)
 experiments/**/full_*_eval.json
+# deployment-accurate eval outputs + exported deploy weights (regenerate: export_weights.py + eval_deploy.py)
+experiments/**/deploy_*_eval*.json
+*.npz
 
 # ── Datasets / large binaries (live outside the repo: D:\DataSet\LRS3) ───
 data_cache/
