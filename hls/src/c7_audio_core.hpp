@@ -34,12 +34,21 @@ static void audio_core(const sample_t *audio_in,
     static data_t y [B][T_LAT];     // TCN state (in-place residual)
     static data_t h [H][T_LAT];     // in_conv output (post bn1)
     static data_t hd[H][T_LAT];     // dwconv output (post bn2)
-// O-3: partition the channel dim (the reduction axis) cyclic-16 so the 1x1 channel reductions
-// (IN1x1 over y, OUT1x1 over hd) read 16/cycle with the channel reduction unrolled (II=4/8).
-#pragma HLS ARRAY_PARTITION variable=w  dim=1 cyclic factor=2
-#pragma HLS ARRAY_PARTITION variable=y  dim=1 cyclic factor=16
-#pragma HLS ARRAY_PARTITION variable=h  dim=1 cyclic factor=16
-#pragma HLS ARRAY_PARTITION variable=hd dim=1 cyclic factor=16
+    static wgt_t  wdl[N][L];        // O-3b: Wdec staged + partitioned on n for the gather decoder
+// O-3: partition the channel dim (the reduction axis) cyclic-16 so the 1x1 channel reductions read
+// 16/cycle with the reduction unrolled. w also feeds BOT (II=8) and the gather decoder (II=16).
+#pragma HLS ARRAY_PARTITION variable=w   dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=y   dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=h   dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=hd  dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=wdl dim=1 cyclic factor=16
+
+    // O-3b: stage the decoder weights once (partitioned on n) for the gather-form decoder below.
+    LDWD: for (int n = 0; n < N; n++)
+        for (int k = 0; k < L; k++) {
+#pragma HLS PIPELINE II=1
+            wdl[n][k] = wts::Wdec[n][k];
+        }
 
     // encoder: Conv1d(1->N, k=L, stride=STRIDE, pad=STRIDE)
     ENC: for (int n = 0; n < N; n++)
@@ -55,16 +64,21 @@ static void audio_core(const sample_t *audio_in,
         }
 
     // bottleneck: y = in_norm(w) -> 1x1(N->B) + video.  in_norm inline (wn cast to data_t).
-    BOT: for (int b = 0; b < B; b++)
+    BOT: for (int b = 0; b < B; b++) {
+        wgt_t wr[N];                               // O-3b: Wbn row -> regs, unroll n (II=8)
+#pragma HLS ARRAY_PARTITION variable=wr complete
+        for (int n = 0; n < N; n++) wr[n] = wts::Wbn[n][b];
         for (int t = 0; t < T_LAT; t++) {
-#pragma HLS PIPELINE II=2
+#pragma HLS PIPELINE II=8
             acc_t a = (acc_t)video_embed[b * T_LAT + t];
             for (int n = 0; n < N; n++) {
+#pragma HLS UNROLL
                 data_t wn = (data_t)(wts::innorm_s[n] * w[n][t] + wts::innorm_b[n]);
-                a += (acc_t)(wn * wts::Wbn[n][b]);
+                a += (acc_t)(wn * wr[n]);
             }
             y[b][t] = (data_t)a;
         }
+    }
 
     // 10 dilated dwsep TCN blocks (residual). PReLU in acc_t, then bn affine, then one data_t cast.
     BLOCKS: for (int blk = 0; blk < NBLK; blk++) {
@@ -121,25 +135,21 @@ static void audio_core(const sample_t *audio_in,
             w[n][t] = (data_t)(w[n][t] * hsig(a));
         }
 
-    // decoder: ConvTranspose1d(N->1, k=L, stride=STRIDE, pad=STRIDE), accumulate. s = t*STRIDE+k-STRIDE.
-    // NOT pipelined: this is a scatter-accumulate (obuf[s] += with a computed index s); consecutive (n,t)
-    // iterations overlap-add onto the same obuf[s] (stride-16 overlap). Pipelining it is a read-modify-write
-    // hazard that C-sim (sequential) hides but real hardware loses updates on -> periodic corruption every
-    // STRIDE samples (confirmed on-board). Sequential accumulate is exact; cost ~ns vs the latency. A
-    // hazard-free GATHER decoder is the throughput-optimization-phase rewrite (D-19).
-    static acc_t obuf[T];
-    INIT_O: for (int s = 0; s < T; s++) obuf[s] = 0;
-    DEC: for (int n = 0; n < N; n++)
-        for (int t = 0; t < T_LAT; t++) {
-            data_t wv = w[n][t];
-            for (int k = 0; k < L; k++) {
-                int s = t * STRIDE + k - STRIDE;
-                if (s >= 0 && s < T) obuf[s] += (acc_t)(wv * wts::Wdec[n][k]);
-            }
+    // decoder: ConvTranspose1d(N->1, k=L, stride=STRIDE, pad=STRIDE) in GATHER form (O-3c). Each output
+    // s is computed exactly once -> no scatter/RMW hazard (the rolled scatter it replaces lost updates on
+    // the real pipeline; D-19). Inverting s = t*STRIDE+k-STRIDE: for a given s the only contributors are
+    // (t=s/16+1, k=s%16) and (t=s/16, k=s%16+16) -- both t always in [0,T_LAT) -> no bounds check. The
+    // acc_t sum is order-independent (products are exact in acc_t), so this is bit-identical to the scatter.
+    DECG: for (int s = 0; s < T; s++) {
+#pragma HLS PIPELINE II=16
+        int tb = s / STRIDE, k0 = s % STRIDE;      // STRIDE=16 (power of 2) -> shift/mask
+        acc_t acc = 0;
+        for (int n = 0; n < N; n++) {
+#pragma HLS UNROLL
+            acc += (acc_t)(w[n][tb + 1] * wdl[n][k0])
+                 + (acc_t)(w[n][tb]     * wdl[n][k0 + STRIDE]);
         }
-    CASTO: for (int s = 0; s < T; s++) {
-#pragma HLS PIPELINE II=1
-        audio_out[s] = (sample_t)obuf[s];
+        audio_out[s] = (sample_t)acc;
     }
 }
 

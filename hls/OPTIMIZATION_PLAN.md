@@ -116,3 +116,11 @@ Work in a **separate** build project (`c7_avse_opt`) so the baseline `c7_avse` s
   standalone (+~72), DSP 13%. Remaining audio: DEC 7.38M (rolled), ENC 4.92M (II=32), BLOCKS 15.6M.
   NOTE: BRAM is the watch item — audio partition added ~72; monolith post-route est now ~91%. Track
   it; dial back the least-valuable partition if integration nears 100%.
+- _(2026-06-28)_ **O-3b done** (BOT + gather decoder). C-sim PASS (rel_rms 6.06e-3, bit-identical).
+  w repartitioned cyclic-16; BOT II 32→**8** (2.46M→0.62M, Wbn row→regs, unroll n). **DEC rewritten as
+  a GATHER** (DECG): each output s computed once from its two scatter contributors `(s/16+1, s/16)` —
+  bit-identical to the scatter (verified by hand + C-sim) but **structurally hazard-free** (no RMW
+  scatter → the on-board decoder hazard root cause is *eliminated*, not just rolled around). DEC 7.38M
+  (II=48) → **0.31M (II=16)**, 24×. **audio_core 30.7M → 21.8M cyc (0.154 → 0.109 s).** BRAM went
+  *down* 1061→1045 (removing the obuf scatter accumulator > the staged Wdec + w repartition); DSP 19%.
+  Projected monolith ≈ 58.3M = 0.29 s (8.8× vs baseline). Remaining: ENC 4.92M (II=32), BLOCKS 15.6M.
