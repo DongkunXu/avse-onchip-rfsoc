@@ -52,32 +52,35 @@ the **dataflow and on-chip memory hierarchy** so a *whole* AVSE pipeline co-resi
 3. [`docs/ROADMAP.md`](docs/ROADMAP.md) — the phased plan and where we are now
 4. [`docs/PROGRESS.md`](docs/PROGRESS.md) — the running log of what's done / in progress / next
 
-## Status (updated 2026-06-25)
+## Status (updated 2026-06-27)
 
-**Phases 1–3 essentially complete; the definitive full-data quality run is the one open task.**
+**The whole goal is achieved on real hardware: a complete, real-weight, single-static-config AVSE runs on
+the RFSoC 4x2 and enhances speech.** End-to-end: full-data training → deployment-accurate quality →
+value-faithful HLS → P&R → bitstream → on-board measurement.
 
-- **Phase 1 (analytical) — DONE.** A working-set model (`analysis/`) validated against the reference
-  (reproduces its 215 % concurrent BRAM and 95 % audio_dec from buffer sizes) scored the candidates and
-  picked **C7 — a Conv-TasNet-style, time-domain mask network with NO U-Net skips** (so the
-  skip-residency wall that forced the reference into 4 bitstreams simply does not exist).
-- **Phase 2 (PyTorch) — DONE; full-data run pending.** C7 implemented in `src/avse/models/` and trained:
-  the 40k-window run peaks at **+4.89 dB SI-SDR** (PESQ 1.68, STOI 0.72) — *above* the FP32 reference
-  (+3.99 dB) — at a **0.017 MB** deployable working set (1/240 of the reference). Pareto in
-  `experiments/pareto.png`. The definitive **full-data run** (`p2-c7-full`, 315k windows, 80 epochs,
-  early-stop 5) is configured and ready; **the owner launches it** (command in
-  [`experiments/PHASE2_PLAN.md`](experiments/PHASE2_PLAN.md)).
-- **Phase 3 (hardware) — FIT CONFIRMED on real reports.** Vitis HLS 2022.2 synth + Vivado place-and-route:
-  - standalone C7 audio path: **46 % BRAM, 17 % LUT, 200 MHz** (post-route).
-  - **monolithic whole AVSE (audio + video, one design): 80 % BRAM, 41 % LUT, 20 % DSP, 200 MHz — fits
-    in ONE static configuration** (`hls/RESULTS_avse_monolithic.md`). The reference needed 215 % BRAM /
-    126 % LUT across 4 PCAP bitstreams. **The project's central hypothesis is proven on real silicon
-    reports** (with placeholder weights — fit is structure-driven).
+- **Phase 1 (analytical) — DONE.** Working-set model (`analysis/`) validated against the reference (reproduces
+  its 215 % concurrent BRAM) picked **C7 — a Conv-TasNet-style time-domain mask network with NO U-Net skips**
+  (so the skip-residency wall that forced the reference into 4 bitstreams does not exist).
+- **Phase 2 (PyTorch) — DONE.** C7 trained on the full data (`p2-c7-full`): **full-dev SI-SDR +5.40 / PESQ
+  1.727 / STOI 0.754** (FP32), *above* the FP32 reference (+3.99) at a **0.017 MB** working set (1/240 of the
+  reference).
+- **Phase 3a (HLS fit, placeholder weights) — DONE.** Established the structure fits one static config.
+- **Phase 3b (real-weight deployment) — DONE.**
+  - **Deployment-accurate quality** (int16 fixed-point emulator, C-sim-validated): **SI-SDR 4.98 / PESQ 1.63 /
+    STOI 0.742** full-dev (int16 quant −0.33 dB; hardsigmoid mask −0.085 dB).
+  - **Real-weight monolithic P&R:** **83 % BRAM, 20 % LUT, 17 % DSP, 200 MHz** (one static config;
+    `hls/RESULTS_avse_monolithic.md`). vs reference 215 % BRAM / 126 % LUT across 4 PCAP bitstreams.
+  - **On-board (RFSoC 4x2, PYNQ), single static bitstream:** **SI-SDR +6.66 / PESQ 1.72 / STOI 0.72** on a
+    16-window subset — beats the mixed input by **+2.27 dB** and matches the emulator to **−0.22 dB**
+    (corr 0.9855). **The central hypothesis is proven on real silicon, enhancing speech.**
 
-### The one open task
-Launch the full-data C7 run (above), then **export its best weights into the HLS weight ROMs** for a
-quality-accurate deployment + final end-to-end eval. Operational notes: run heavy jobs **one at a time**
-on this 32 GB host (Vivado P&R vs GPU training — DECISIONS D-11); the dataset window-list is cached
-(`.dataset_cache/`) so runs start in ~0.2 s. Full timeline in [`docs/PROGRESS.md`](docs/PROGRESS.md).
+### Open items (the deferred optimization phase)
+- **Throughput / pipelining optimization** (DECISIONS D-19): the video encoder is currently a conservative
+  *rolled* schedule (correct but 11.67 s/window — un-bursted element-wise `video_in` DDR reads). Burst/cache
+  the video frame on-chip + re-pipeline → faster, and likely closes the small (~2 % rms, −0.22 dB,
+  quality-negligible) silicon-vs-design residual. Then a larger on-board eval at speed.
+- Operational: 32 GB host — run heavy jobs one at a time (D-11); board access in
+  [memory `board-access`]; full timeline in [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Environment
 

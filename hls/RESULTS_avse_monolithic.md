@@ -25,6 +25,17 @@ conservative **rolled** schedule (D-19; throughput optimization is a deliberate 
 **Timing MET** — post-route CP 4.869 ns < 5.000 ns → **200 MHz**, WNS +0.131 ns. Packaged IP: `export.zip`.
 Latency 2.53 s/window (rolled video dominates — the throughput-optimization target, D-19).
 
+### On real hardware (RFSoC 4x2, PYNQ) — the single static bitstream RUNS ✅
+
+The IP was wrapped into a static system (Zynq PS + the IP, `hw/tcl/`), a single bitstream built and deployed
+to the board, and run on real silicon (`hw/board/run_fpga.py`). After fixing a decoder scatter-accumulate
+pipeline hazard found on-board (it passed C-sim — only hardware reveals RMW pipeline hazards), the full AVSE
+enhances speech: **on-board SI-SDR +6.66 / PESQ 1.72 / STOI 0.72** (16-win subset), beating the mixed input by
+**+2.27 dB** and matching the fixed-point emulator to **−0.22 dB** (corr 0.9855). Bitstream post-route =
+**83 % BRAM / 20 % LUT / 17 % DSP / 200 MHz** (rolled-decoder rebuild). On-board compute 11.67 s/window
+(un-bursted video DDR reads — the throughput-opt target). **The reference needed 4 PCAP bitstreams; this whole
+AVSE runs in ONE static configuration on real hardware.**
+
 > **The complete AVSE with the REAL trained weights, computation C-sim-validated, fits ONE static FPGA
 > configuration and closes timing: 85 % BRAM, 19 % LUT, 17 % DSP, 200 MHz.** BRAM (the activation/weight
 > wall) is the binding resource at 85 % — ~15 % headroom; real weight ROMs raise it vs the placeholder

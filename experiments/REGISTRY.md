@@ -34,7 +34,23 @@ the emulator's fp+sigmoid path reproduces the FP32 row (5.399/1.727/0.754) to 3 
 | **int16 + hardsigmoid (on-chip)** | **+4.984** | **1.632** | **0.742** | the deployed number; hardsigmoid adds −0.085 dB |
 
 On-chip C7 beats the FP32 teacher anchor (SI-SDR +0.99, STOI +0.001) at 1/240 the working set, single static
-config (80% BRAM). The HLS C-sim cross-check (emulator ≡ silicon) is the remaining confirmation (Deliverable B).
+config (83% BRAM post-route). HLS C-sim confirmed emulator ≡ HLS-C++ to 0.85% (B2).
+
+## On real hardware (RFSoC 4x2, single static bitstream) — `hw/board/run_fpga.py`
+
+The whole real-weight AVSE built end-to-end (HLS → P&R → bitstream → board) and run on the FPGA. 16-window /
+2-scene subset (board compute 11.67 s/window — un-optimized rolled video):
+
+| | SI-SDR | PESQ-WB | STOI | note |
+|---|---:|---:|---:|---|
+| **on-board (FPGA)** | **+6.66** | **1.72** | **0.72** | real silicon, one static bitstream |
+| emulator (same 16 win) | +6.88 | 1.73 | 0.72 | board matches to **−0.22 dB**, corr 0.9855 |
+| mixed input (baseline) | +4.40 | 1.50 | 0.62 | board beats it by **+2.27 dB** |
+
+A decoder scatter-accumulate pipeline hazard (periodic corruption, C-sim-invisible) was found and fixed
+on-board. A small (~2% rms, −0.22 dB, quality-negligible) silicon-vs-design residual remains — deferred to
+the throughput-optimization phase (un-bursted video DDR reads). Post-route: BRAM 83% / LUT 20% / DSP 17% /
+200 MHz. **The project's central goal is demonstrated on real silicon enhancing speech.**
 
 ## Reference anchors (for comparison, not experiments)
 
