@@ -124,3 +124,12 @@ Work in a **separate** build project (`c7_avse_opt`) so the baseline `c7_avse` s
   (II=48) → **0.31M (II=16)**, 24×. **audio_core 30.7M → 21.8M cyc (0.154 → 0.109 s).** BRAM went
   *down* 1061→1045 (removing the obuf scatter accumulator > the staged Wdec + w repartition); DSP 19%.
   Projected monolith ≈ 58.3M = 0.29 s (8.8× vs baseline). Remaining: ENC 4.92M (II=32), BLOCKS 15.6M.
+- _(2026-06-28)_ **O-3c done** (ENC). C-sim PASS (rel_rms 6.06e-3). audio_in cached on-chip (abuf,
+  cyclic-16; read once vs 128× DDR) + 32-tap kernel unrolled (Wenc row→regs) → ENC II 32→**2**
+  (4.92M→0.30M). **audio_core 21.8M → 17.2M cyc (0.109 → 0.086 s).** BRAM 1048 (48% — abuf packed
+  cheaply), DSP 19%. BLOCKS (15.6M) is now 91% of audio = the BRAM-expensive frontier; **holding it**
+  until the integrated monolith post-route BRAM is known.
+- **Audio summary: 69.5M → 17.2M cyc (0.347 → 0.086 s, 4.0×).** Projected monolith ≈ **53.7M = 0.27 s**
+  (video 36.25M + audio 17.2M + VPROJ/VUP 0.28M) — **9.5× vs the 2.564 s baseline, 4.4× under real-time.**
+- **NEXT: integrate** → monolith C-sim (8 min) + csynth (~2.5 h) → P&R (run alone, D-11) → bitstream →
+  on-board. Then decide on BLOCKS based on real post-route BRAM headroom.

@@ -35,6 +35,7 @@ static void audio_core(const sample_t *audio_in,
     static data_t h [H][T_LAT];     // in_conv output (post bn1)
     static data_t hd[H][T_LAT];     // dwconv output (post bn2)
     static wgt_t  wdl[N][L];        // O-3b: Wdec staged + partitioned on n for the gather decoder
+    static sample_t abuf[T];        // O-3c: cache audio_in on-chip (read once vs 128x DDR), taps in parallel
 // O-3: partition the channel dim (the reduction axis) cyclic-16 so the 1x1 channel reductions read
 // 16/cycle with the reduction unrolled. w also feeds BOT (II=8) and the gather decoder (II=16).
 #pragma HLS ARRAY_PARTITION variable=w   dim=1 cyclic factor=16
@@ -42,6 +43,7 @@ static void audio_core(const sample_t *audio_in,
 #pragma HLS ARRAY_PARTITION variable=h   dim=1 cyclic factor=16
 #pragma HLS ARRAY_PARTITION variable=hd  dim=1 cyclic factor=16
 #pragma HLS ARRAY_PARTITION variable=wdl dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=abuf     cyclic factor=16
 
     // O-3b: stage the decoder weights once (partitioned on n) for the gather-form decoder below.
     LDWD: for (int n = 0; n < N; n++)
@@ -50,18 +52,30 @@ static void audio_core(const sample_t *audio_in,
             wdl[n][k] = wts::Wdec[n][k];
         }
 
-    // encoder: Conv1d(1->N, k=L, stride=STRIDE, pad=STRIDE)
-    ENC: for (int n = 0; n < N; n++)
+    // O-3c: cache audio_in on-chip once (the encoder reads it N=128x; on-board these were un-bursted
+    // strided DDR reads), partitioned cyclic-16 so the 32-tap window reads in parallel.
+    LDA: for (int i = 0; i < T; i++) {
+#pragma HLS PIPELINE II=1
+        abuf[i] = audio_in[i];
+    }
+
+    // encoder: Conv1d(1->N, k=L, stride=STRIDE, pad=STRIDE). Kernel unrolled (Wenc row -> regs), II=2.
+    ENC: for (int n = 0; n < N; n++) {
+        wgt_t wr[L];
+#pragma HLS ARRAY_PARTITION variable=wr complete
+        for (int k = 0; k < L; k++) wr[k] = wts::Wenc[n][k];
         for (int t = 0; t < T_LAT; t++) {
 #pragma HLS PIPELINE II=2
             acc_t a = 0;
             for (int k = 0; k < L; k++) {
+#pragma HLS UNROLL
                 int s = t * STRIDE + k - STRIDE;
-                sample_t x = (s >= 0 && s < T) ? audio_in[s] : (sample_t)0;
-                a += (acc_t)(x * wts::Wenc[n][k]);
+                sample_t x = (s >= 0 && s < T) ? abuf[s] : (sample_t)0;
+                a += (acc_t)(x * wr[k]);
             }
             w[n][t] = (data_t)a;
         }
+    }
 
     // bottleneck: y = in_norm(w) -> 1x1(N->B) + video.  in_norm inline (wn cast to data_t).
     BOT: for (int b = 0; b < B; b++) {
