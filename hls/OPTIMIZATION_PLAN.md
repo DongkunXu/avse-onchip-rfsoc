@@ -96,3 +96,16 @@ Work in a **separate** build project (`c7_avse_opt`) so the baseline `c7_avse` s
   and unroll the channel reduction → II≈4 (Cin 64) / 6 (Cin 96). Channel→bank, spatial→address makes
   the strided shortcut reads conflict-free (the original 6 h blow-up was strided-into-spatial +
   complete-partitioned big ROMs — both avoided). Do PW loops first, then the strided SC loops.
+- _(2026-06-27)_ **O-2b done** (6 pointwise/shortcut convs). C-sim PASS (rel_rms 8.54e-3, unchanged).
+  Each loop: weight row → complete-partitioned registers; channel buffers (dw/b0/b1/b2) partitioned
+  cyclic-16; channel reduction unrolled. Achieved **II=4** (PW1/SC1, Cin 64) / **II=6–7** (PW2/SC2/
+  PW3/SC3, Cin 96) — exactly as designed, no II violation. video_encoder **231.0M → 36.25M cyc**;
+  **Total 300.79M → 106.03M cyc (1.504 → 0.530 s)** — under real-time. Audio (69.5M) is now 66% of
+  the total. BRAM 75% (+18 — factor-16 + register-weights kept it ~flat, as planned), DSP 31%, LUT 70%
+  (csynth; post-route over-counts → will drop). **NOTE:** csynth took 2.48 h (front-end analysis of
+  the 6× 64–96-wide unrolls with cyclic-16 partition). Verified this is *slowness, not a bug*
+  (II correct, C-sim PASS) → accepted per owner ("慢可接受,别为它放弃优化"). To iterate fast, O-3
+  uses the standalone audio synth (~3 min); the monolith is synthesized once at integration.
+- **O-3 target:** audio_core 69.5M = 0.347 s, now the bottleneck. BLOCKS (10 TCN) = 52.3M; within it
+  IN1x1 (II=16) + OUT1x1 (II=32) dominate. Raise partition on y/h/hd + unroll the B/H reductions
+  (same channel-partition + register-weight recipe), guard BRAM (~88% post-route est after O-2b).

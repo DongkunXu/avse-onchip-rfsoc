@@ -44,13 +44,15 @@ static void video_encoder(const data_t *video_in, data_t video_feat[vid::C][vid:
     static data_t b3[C][S3 * S3];    // stage3 out [96][36]
     static data_t pooled[C][4];      // avgpool 2x2
     static data_t fpb[C];            // feature_proj out
-    // CONSERVATIVE baseline schedule: the video encoder is synthesized ROLLED (no per-loop pipelining,
-    // no buffer partitioning). It is NOT the throughput bottleneck (the audio path dominates), and
-    // pipelining here forced wide (x96) reduction unrolls + bank-conflict analysis on strided shortcut
-    // reads into partitioned buffers -> HLS scheduling exploded to many hours. Rolled is functionally
-    // identical (C-sim validated) and synthesizes in minutes at low resource. Pipelining/unrolling/reuse
-    // of the video path for real-time throughput is a deliberate SEPARATE optimization step (DEPLOY_PLAN),
-    // not part of getting the end-to-end flow to bitstream.
+    // O-2b: partition the reduction-input buffers on the CHANNEL dim (the reduction axis) so the
+    // pointwise/shortcut channel reductions read 16 inputs/cycle (II~4-6). Channel->bank,
+    // spatial->within-bank address keeps the strided shortcut reads conflict-free (the original 6 h
+    // blow-up was strided reads into SPATIALLY-partitioned buffers + complete-partitioned big ROMs;
+    // both avoided here). Factor 16 keeps BRAM ~flat (complete would double it via bank rounding).
+#pragma HLS ARRAY_PARTITION variable=b0 dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=dw dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=b1 dim=1 cyclic factor=16
+#pragma HLS ARRAY_PARTITION variable=b2 dim=1 cyclic factor=16
 
     // O-2a: stage the conv0 weights once into a fully-partitioned local buffer so the unrolled 7x7
     // kernel can read all 49 taps in parallel (the namespace ROM wts::v_c0_w can't take a partition
@@ -104,17 +106,35 @@ static void video_encoder(const data_t *video_in, data_t video_feat[vid::C][vid:
                 }
                 dw[c][oy * S1 + ox] = (data_t)a;
             }
-        PW1: for (int co = 0; co < C; co++)
-            for (int p = 0; p < S1 * S1; p++) {                acc_t a = (acc_t)wts::v_pw1_b[co];
-                for (int ci = 0; ci < C0; ci++) a += (acc_t)(dw[ci][p] * wts::v_pw1_w[co][ci]);
+        PW1: for (int co = 0; co < C; co++) {                  // O-2b: weight row -> regs, unroll ci (II=4)
+            wgt_t wr[C0];
+#pragma HLS ARRAY_PARTITION variable=wr complete
+            for (int ci = 0; ci < C0; ci++) wr[ci] = wts::v_pw1_w[co][ci];
+            for (int p = 0; p < S1 * S1; p++) {
+#pragma HLS PIPELINE II=4
+                acc_t a = (acc_t)wts::v_pw1_b[co];
+                for (int ci = 0; ci < C0; ci++) {
+#pragma HLS UNROLL
+                    a += (acc_t)(dw[ci][p] * wr[ci]);
+                }
                 main_[co][p] = vrelu(a);                       // pointwise + BN + ReLU
             }
-        SC1: for (int co = 0; co < C; co++)                     // shortcut Conv2d(1x1,s2)+BN, no act
-            for (int oy = 0; oy < S1; oy++) for (int ox = 0; ox < S1; ox++) {                acc_t a = (acc_t)wts::v_sc1_b[co];
-                for (int ci = 0; ci < C0; ci++) a += (acc_t)(b0[ci][(oy * 2) * S0 + ox * 2] * wts::v_sc1_w[co][ci]);
+        }
+        SC1: for (int co = 0; co < C; co++) {                   // shortcut Conv2d(1x1,s2)+BN, no act
+            wgt_t wr[C0];
+#pragma HLS ARRAY_PARTITION variable=wr complete
+            for (int ci = 0; ci < C0; ci++) wr[ci] = wts::v_sc1_w[co][ci];
+            for (int oy = 0; oy < S1; oy++) for (int ox = 0; ox < S1; ox++) {
+#pragma HLS PIPELINE II=4
+                acc_t a = (acc_t)wts::v_sc1_b[co];
+                for (int ci = 0; ci < C0; ci++) {
+#pragma HLS UNROLL
+                    a += (acc_t)(b0[ci][(oy * 2) * S0 + ox * 2] * wr[ci]);
+                }
                 int p = oy * S1 + ox;
                 b1[co][p] = (data_t)((acc_t)main_[co][p] + (acc_t)(data_t)a);   // q(main) + q(sc)
             }
+        }
 
         // stage 2: in=b1(C,S1) -> out b2(C,S2)
         DW2: for (int c = 0; c < C; c++)
@@ -126,17 +146,35 @@ static void video_encoder(const data_t *video_in, data_t video_feat[vid::C][vid:
                 }
                 dw[c][oy * S2 + ox] = (data_t)a;
             }
-        PW2: for (int co = 0; co < C; co++)
-            for (int p = 0; p < S2 * S2; p++) {                acc_t a = (acc_t)wts::v_pw2_b[co];
-                for (int ci = 0; ci < C; ci++) a += (acc_t)(dw[ci][p] * wts::v_pw2_w[co][ci]);
+        PW2: for (int co = 0; co < C; co++) {                  // O-2b: weight row -> regs, unroll ci (II=6)
+            wgt_t wr[C];
+#pragma HLS ARRAY_PARTITION variable=wr complete
+            for (int ci = 0; ci < C; ci++) wr[ci] = wts::v_pw2_w[co][ci];
+            for (int p = 0; p < S2 * S2; p++) {
+#pragma HLS PIPELINE II=6
+                acc_t a = (acc_t)wts::v_pw2_b[co];
+                for (int ci = 0; ci < C; ci++) {
+#pragma HLS UNROLL
+                    a += (acc_t)(dw[ci][p] * wr[ci]);
+                }
                 main_[co][p] = vrelu(a);
             }
-        SC2: for (int co = 0; co < C; co++)
-            for (int oy = 0; oy < S2; oy++) for (int ox = 0; ox < S2; ox++) {                acc_t a = (acc_t)wts::v_sc2_b[co];
-                for (int ci = 0; ci < C; ci++) a += (acc_t)(b1[ci][(oy * 2) * S1 + ox * 2] * wts::v_sc2_w[co][ci]);
+        }
+        SC2: for (int co = 0; co < C; co++) {
+            wgt_t wr[C];
+#pragma HLS ARRAY_PARTITION variable=wr complete
+            for (int ci = 0; ci < C; ci++) wr[ci] = wts::v_sc2_w[co][ci];
+            for (int oy = 0; oy < S2; oy++) for (int ox = 0; ox < S2; ox++) {
+#pragma HLS PIPELINE II=6
+                acc_t a = (acc_t)wts::v_sc2_b[co];
+                for (int ci = 0; ci < C; ci++) {
+#pragma HLS UNROLL
+                    a += (acc_t)(b1[ci][(oy * 2) * S1 + ox * 2] * wr[ci]);
+                }
                 int p = oy * S2 + ox;
                 b2[co][p] = (data_t)((acc_t)main_[co][p] + (acc_t)(data_t)a);
             }
+        }
 
         // stage 3: in=b2(C,S2) -> out b3(C,S3)
         DW3: for (int c = 0; c < C; c++)
@@ -148,17 +186,35 @@ static void video_encoder(const data_t *video_in, data_t video_feat[vid::C][vid:
                 }
                 dw[c][oy * S3 + ox] = (data_t)a;
             }
-        PW3: for (int co = 0; co < C; co++)
-            for (int p = 0; p < S3 * S3; p++) {                acc_t a = (acc_t)wts::v_pw3_b[co];
-                for (int ci = 0; ci < C; ci++) a += (acc_t)(dw[ci][p] * wts::v_pw3_w[co][ci]);
+        PW3: for (int co = 0; co < C; co++) {                  // O-2b: weight row -> regs, unroll ci (II=6)
+            wgt_t wr[C];
+#pragma HLS ARRAY_PARTITION variable=wr complete
+            for (int ci = 0; ci < C; ci++) wr[ci] = wts::v_pw3_w[co][ci];
+            for (int p = 0; p < S3 * S3; p++) {
+#pragma HLS PIPELINE II=6
+                acc_t a = (acc_t)wts::v_pw3_b[co];
+                for (int ci = 0; ci < C; ci++) {
+#pragma HLS UNROLL
+                    a += (acc_t)(dw[ci][p] * wr[ci]);
+                }
                 main_[co][p] = vrelu(a);
             }
-        SC3: for (int co = 0; co < C; co++)
-            for (int oy = 0; oy < S3; oy++) for (int ox = 0; ox < S3; ox++) {                acc_t a = (acc_t)wts::v_sc3_b[co];
-                for (int ci = 0; ci < C; ci++) a += (acc_t)(b2[ci][(oy * 2) * S2 + ox * 2] * wts::v_sc3_w[co][ci]);
+        }
+        SC3: for (int co = 0; co < C; co++) {
+            wgt_t wr[C];
+#pragma HLS ARRAY_PARTITION variable=wr complete
+            for (int ci = 0; ci < C; ci++) wr[ci] = wts::v_sc3_w[co][ci];
+            for (int oy = 0; oy < S3; oy++) for (int ox = 0; ox < S3; ox++) {
+#pragma HLS PIPELINE II=6
+                acc_t a = (acc_t)wts::v_sc3_b[co];
+                for (int ci = 0; ci < C; ci++) {
+#pragma HLS UNROLL
+                    a += (acc_t)(b2[ci][(oy * 2) * S2 + ox * 2] * wr[ci]);
+                }
                 int p = oy * S3 + ox;
                 b3[co][p] = (data_t)((acc_t)main_[co][p] + (acc_t)(data_t)a);
             }
+        }
 
         // ---- AvgPool2d(k5,s1): 6x6 -> 2x2 ----
         POOL: for (int c = 0; c < C; c++)
