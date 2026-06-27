@@ -67,9 +67,21 @@ ended.** Investigated honestly (not re-run blindly):
 - Note: measured on-board compute = **11.67 s/window** (not the 2.5 s csynth estimate) — the rolled video
   reads `video_in` element-by-element from DDR with no bursting; this is the prime throughput-optimization
   target (D-19), to tackle after the corrected end-to-end run is confirmed.
-- ⏭ When the rebuilt bitstream is done: redeploy + re-run the 16 windows → confirm silicon ≡ emulator (the
-  4.98 dB on real hardware). Then (separate phase) throughput optimization (D-19). See
-  [[hls-synthesis-and-optimization]] memory.
+- ✅ **DECODER FIX VERIFIED ON-BOARD — the single-config AVSE enhances speech on real silicon.** Rebuilt
+  bitstream (rolled decoder; post-route 83% BRAM / 20% LUT / 17% DSP / 200 MHz, WNS +0.055 ns), redeployed,
+  re-ran the 16 windows. Output no longer saturates; periodic corruption gone. **On-board (16 win / 2 scenes):
+  SI-SDR +6.66, PESQ 1.72, STOI 0.72** — beats the mixed input (+4.40) by **+2.27 dB**, and **matches the
+  emulator on the same windows to −0.22 dB SI-SDR** (emulator 6.88/1.73/0.72). corr(board, emulator) = 0.9855.
+- Residual: silicon vs emulator = 2.2 % rms (down from 26.9 % pre-fix); the current-design C-sim still matches
+  the emulator at 0.85 %, so the board carries a small (~1.5 %) **hardware-vs-design residual** — NOT a classic
+  RMW hazard (all such loops are now write-once or rolled), most likely the rolled video's **un-bursted,
+  element-wise `video_in` DDR reads** (also the cause of the 11.67 s/window). Quality-negligible (−0.22 dB);
+  to be resolved in the throughput-optimization phase (which restructures the video DDR access anyway, D-19).
+- ✅ **The current task is achieved: the whole real-weight, single-static-config AVSE is built end-to-end
+  (HLS → P&R → bitstream → RFSoC 4x2) and measured on real hardware enhancing speech.**
+- ⏭ Next (the explicitly-deferred phase): **throughput / pipelining optimization** (D-19) — burst/cache the
+  video DDR reads + re-pipeline (fixes the 11.67 s/window AND likely the residual), then a larger on-board
+  eval at speed. Enriches the circuits-architecture narrative. See [[hls-synthesis-and-optimization]].
 
 ## 2026-06-27 — Phase 3b kickoff: real-weight deployment + deployment-accurate quality 🔄
 
