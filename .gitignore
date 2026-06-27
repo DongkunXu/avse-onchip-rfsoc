@@ -57,6 +57,14 @@ hls/build/
 hw/**/*.xpr
 hw/**/*.runs/
 hw/**/*.cache/
+# Vivado system build + PYNQ overlay + transient build logs (regenerable: hw/tcl/ + the HLS IP + best.pt)
+hw/vivado_proj/
+hw/overlay/
+hw/board/board_*.npz
+hw/*.log
+hw/*.out
+hw/*.err
+hw/*.flag
 
 # ── Scratch / throwaway exploration ──────────────────────────────────────
 scratch/
