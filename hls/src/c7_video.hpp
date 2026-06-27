@@ -30,6 +30,7 @@ static void video_encoder(const data_t *video_in, data_t video_feat[vid::C][vid:
     using namespace vid;
 
     // per-frame buffers (reused across 30 frames)
+    static data_t fbuf[IN * IN];     // O-1: on-chip cache of the current 96x96 frame (one DDR burst)
     static data_t b0[C0][S0 * S0];   // conv0 out  [64][2304]
     static data_t dw[C][S1 * S1];    // depthwise scratch (max [96][576])
     static data_t main_[C][S1 * S1]; // pointwise+relu main (max [96][576])
@@ -49,6 +50,14 @@ static void video_encoder(const data_t *video_in, data_t video_feat[vid::C][vid:
     FRAMES: for (int f = 0; f < TF; f++) {
         const data_t *img = video_in + f * IN * IN;
 
+        // ---- O-1: burst-cache this frame on-chip (one contiguous 96x96 DDR read) so the conv reads
+        // hit BRAM instead of issuing per-element DDR round-trips (the on-board 4.55x penalty). The
+        // values are identical; only the memory staging changes.
+        LOADF: for (int i = 0; i < IN * IN; i++) {
+#pragma HLS PIPELINE II=1
+            fbuf[i] = img[i];
+        }
+
         // ---- conv0: Conv2d(1->64,k7,s2,p3) + BN(folded) + ReLU ----
         CONV0: for (int co = 0; co < C0; co++)
             for (int oy = 0; oy < S0; oy++)
@@ -56,7 +65,7 @@ static void video_encoder(const data_t *video_in, data_t video_feat[vid::C][vid:
                     for (int ky = 0; ky < 7; ky++)
                         for (int kx = 0; kx < 7; kx++) {
                             int iy = oy * 2 - 3 + ky, ix = ox * 2 - 3 + kx;
-                            data_t v = (iy >= 0 && iy < IN && ix >= 0 && ix < IN) ? img[iy * IN + ix] : (data_t)0;
+                            data_t v = (iy >= 0 && iy < IN && ix >= 0 && ix < IN) ? fbuf[iy * IN + ix] : (data_t)0;
                             a += (acc_t)(v * wts::v_c0_w[co][ky][kx]);
                         }
                     b0[co][oy * S0 + ox] = vrelu(a);
