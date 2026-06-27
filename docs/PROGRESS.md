@@ -8,6 +8,31 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-27 — B3 real-weight synthesis: diagnosed a 6 h HLS blow-up; audio+video synth FAST + FIT 🔄
+
+**The first real-weight monolithic csynth ran ~6 h without producing a report and was lost when the session
+ended.** Investigated honestly (not re-run blindly):
+- ✅ **It produced no result** — no `c7_avse` report anywhere; it spent ~16 min in Standard Transforms then
+  the remaining ~5.7 h in scheduling/binding and never reached report generation. (Owned a mistake: relaunched
+  with `open_project -reset` which overwrote the old detailed log — but the old run had no report to lose.)
+- ✅ **Isolated the cause** by synthesizing each core standalone (real weights): the **audio core synthesizes
+  in ~3 min and FITS** — **BRAM 1031 (47%), DSP 601 (14%), LUT 122566 (28%), ~200 MHz** (DSP up from the
+  placeholder ~12% because the `bn_t<32,16>` inline in_norm/bn affines are wide multiplies; still comfortable).
+  The 6 h was **entirely the faithful video encoder**.
+- ✅ **Root cause (video):** over-aggressive per-loop pipelining (II=2) forced wide (×96) reduction unrolls +
+  bank-conflict analysis on **strided shortcut reads into cyclic-partitioned buffers**, and complete-
+  partitioned the `v_fp_w`(36864)/`v_tp_w`(9216) weight ROMs into registers → HLS scheduling/binding exploded.
+- ✅ **Fix (DECISIONS D-19):** the video is NOT the throughput bottleneck (audio dominates latency), so it is
+  synthesized in a **conservative ROLLED schedule** (no per-loop pipeline / no buffer partition) — functionally
+  identical (C-sim still valid), low resource, synthesizes in **~5 min**: standalone video (rolled, real
+  weights) = **BRAM 489 (22%), DSP 226 (5%), LUT 69391 (16%)**, latency 2.2 s (slow — that is the deferred
+  throughput-optimization target, owner-directed). Diagnostic standalone top: `c7_video_top.cpp`.
+- 🔄 Monolithic `c7_avse_top` csynth (pipelined audio + rolled video) RUNNING — the real single-config total.
+- ⏭ Then Vivado P&R → bitstream → on-board measurement (the current end goal). **Throughput/pipelining
+  optimization of the video is a deliberate LATER step** (owner: get the full flow + board numbers first,
+  no shortcuts on the computation; then optimize — it also strengthens the circuits narrative). See
+  [[hls-synthesis-and-optimization]] memory.
+
 ## 2026-06-27 — Phase 3b kickoff: real-weight deployment + deployment-accurate quality 🔄
 
 **Next task started: turn the FP32 quality number into the on-chip int16-deployment number, and wire the

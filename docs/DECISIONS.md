@@ -157,6 +157,21 @@ they cannot drift; HLS C-sim will cross-check emulator ≡ silicon (Deliverable 
 **inline** rather than folded into the dwconv/out_conv because PyTorch zero-pads the bn1 output before the
 dwconv — folding to a single per-channel bias would mis-handle the pad boundary (see `hls/DEPLOY_PLAN.md`).
 
+### D-19 ✅ Video encoder synthesized in a conservative ROLLED schedule; throughput optimization deferred
+**2026-06-27 — owner-directed framing ("get the full flow + on-board numbers first, no shortcuts on the
+computation; performance/throughput optimization comes after").** The first real-weight monolithic csynth
+ran ~6 h without finishing. Root-caused to the faithful video encoder: per-loop II=2 pipelining forced wide
+(×96) reduction unrolls and bank-conflict analysis on strided shortcut reads into cyclic-partitioned buffers,
+and complete-partitioned the `v_fp_w`/`v_tp_w` weight ROMs into registers → scheduling/binding exploded. The
+video is **not** the throughput bottleneck (the audio path dominates latency), so it is synthesized **rolled**
+(no per-loop pipeline / no array partition). This is **not a shortcut**: the computation is byte-identical (the
+HLS C-sim emulator≡silicon check still holds), only the *hardware schedule* is conservative — low resource,
+high latency (2.2 s), synthesizes in ~5 min. Audio stays pipelined (II=2, synthesizes in ~3 min, fits 47%
+BRAM/14% DSP/28% LUT). **Re-introducing pipelining / unrolling / module reuse on the video for real-time
+throughput is a deliberate SEPARATE optimization phase** AFTER the end-to-end flow + on-board measurement is
+in hand — it also strengthens the circuits-architecture narrative (the resource×efficiency trade is itself a
+contribution). Tracked in the [[hls-synthesis-and-optimization]] memory.
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).
