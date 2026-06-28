@@ -133,3 +133,10 @@ Work in a **separate** build project (`c7_avse_opt`) so the baseline `c7_avse` s
   (video 36.25M + audio 17.2M + VPROJ/VUP 0.28M) — **9.5× vs the 2.564 s baseline, 4.4× under real-time.**
 - **NEXT: integrate** → monolith C-sim (8 min) + csynth (~2.5 h) → P&R (run alone, D-11) → bitstream →
   on-board. Then decide on BLOCKS based on real post-route BRAM headroom.
+- _(2026-06-28)_ **Integration C-sim PASS** (rel_rms 8.538e-3 — bit-identical to the original baseline).
+  The fully-integrated optimized design (video O-1/2a/2b + audio O-3a/b/c together) is value-faithful
+  end-to-end. The first monolith csynth (run via the session-bound background tool) was **killed at a
+  session boundary** (the detached-process lesson — long syntheses must use `Start-Process`). Relaunched
+  as csynth+export **detached** (`hls/build/int_run.bat` → `run_csynth_export_avse_opt.tcl`, writes
+  `int2_csynth.flag`); polling for completion. Export goes to `c7_avse_opt/sol1/impl/ip` for the opt
+  bitstream (`hw/rebuild_vivado_opt.bat`).
