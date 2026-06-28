@@ -102,12 +102,16 @@ def main():
                            precision="int16", mask="hardsigmoid")
         # feed the SAME int16 inputs (dequantized) through the emulator
         est = np.zeros_like(enh)
+        MB = 8  # mini-batch the emulator (video conv intermediates are large)
         for c in range(nch):
             ww = np.load(d / f"chunk_{c:03d}_windows.npz")
             ai = ww["audio_in"].astype(np.float32) / 32768.0
             vi = ww["video_in"].astype(np.float32) / 512.0
-            with torch.no_grad():
-                e = emu.forward(torch.tensor(ai)[:, None, :], torch.tensor(vi)).numpy()[:, 0, :]
+            e = np.zeros_like(ai)
+            for s in range(0, len(ai), MB):
+                with torch.no_grad():
+                    e[s:s+MB] = emu.forward(torch.tensor(ai[s:s+MB])[:, None, :],
+                                            torch.tensor(vi[s:s+MB])).numpy()[:, 0, :]
             idx = np.where(chunk == c)[0]
             for wi in idx:
                 est[wi] = e[row[wi]]

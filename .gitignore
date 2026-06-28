@@ -61,6 +61,9 @@ hw/**/*.cache/
 hw/vivado_proj/
 hw/overlay/
 hw/board/board_*.npz
+# stratified SNR-bin eval working data (regenerable: prep_board_snr_bins.py + run_board_chunks.sh + score)
+hw/board/snr_eval/
+hw/board/snr_smoke/
 hw/*.log
 hw/*.out
 hw/*.err

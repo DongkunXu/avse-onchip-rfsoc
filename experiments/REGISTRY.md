@@ -73,6 +73,34 @@ NOT the DDR reads (a silicon-vs-C-sim effect; co-sim item). The decoder hazard i
 (gather, no scatter). **The whole AVSE runs faster than real-time on one static bitstream, vs the reference's
 4 PCAP bitstreams.**
 
+### Stratified per-SNR-bin on-board eval (2026-06-28) — the representative, comparable number
+
+Mirrors the reference 10-bin SNR protocol (`test reference/selection_manifest.json`: 10 bins × 2.5 dB,
+−15…+10 dB, seed 42), **20% of scenes sampled per bin** (665 scenes / 4917 windows), run on the optimized
+FPGA, scored per scene → per bin → **scene-count-weighted** (tools: `prep_board_snr_bins.py`,
+`run_board_chunks.sh`, `score_board_snr_bins.py`, `plot_snr_bins.py`). Our validated windowing/normalization.
+
+| input SNR (dB) | n | FPGA SI-SDR | PESQ | STOI | mixed SI-SDR | Δ SI-SDR |
+|---|--:|--:|--:|--:|--:|--:|
+| [−15,−12.5] | 36 | −5.72 | 1.150 | 0.531 | −11.99 | +6.27 |
+| [−12.5,−10] | 38 | −4.74 | 1.139 | 0.553 | −10.56 | +5.82 |
+| [−10,−7.5] | 82 | 0.51 | 1.337 | 0.629 | −4.99 | +5.50 |
+| [−7.5,−5] | 89 | 1.72 | 1.449 | 0.687 | −2.25 | +3.97 |
+| [−5,−2.5] | 81 | 4.27 | 1.497 | 0.746 | 0.05 | +4.22 |
+| [−2.5,0] | 85 | 6.10 | 1.665 | 0.788 | 4.57 | +1.53 |
+| [0,2.5] | 87 | 6.34 | 1.705 | 0.776 | 5.80 | +0.54 |
+| [2.5,5] | 86 | 7.91 | 1.814 | 0.800 | 7.86 | +0.05 |
+| [5,7.5] | 45 | 13.31 | 2.223 | 0.876 | 13.41 | −0.10 |
+| [7.5,10] | 36 | 15.30 | 2.322 | 0.904 | 15.59 | −0.29 |
+| **weighted (by bin scenes)** | **665** | **4.59** | **1.615** | **0.735** | **1.95** | **+2.64** |
+
+Clean monotonic SNR trend; the model does its work at low/mid SNR (+5–6 dB SI-SDR in the −15…−7.5 bins) and
+≈preserves above ~+5 dB. **FPGA is value-faithful per bin**: the int16 **software (emulator)** on the same
+windows = weighted **4.80 / 1.618 / 0.738**, so FPGA trails by **−0.21 dB** (= the established silicon-vs-
+emulator gap, corr 0.9855). The weighted overall reconciles with the full-dev emulator (4.98) within the 20%
+sampling; proportional sampling → weighted ≡ simple mean (both 4.59). Plot: `hw/board/snr_eval/
+snr_trend_onboard.png`; full JSON: `snr_bin_results.json`. (FP32 per-bin upper bound is a quick GPU add-on.)
+
 ## Reference anchors (for comparison, not experiments)
 
 | name | SI-SDR | PESQ-WB | STOI | note |
