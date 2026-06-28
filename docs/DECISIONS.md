@@ -172,7 +172,7 @@ throughput is a deliberate SEPARATE optimization phase** AFTER the end-to-end fl
 in hand — it also strengthens the circuits-architecture narrative (the resource×efficiency trade is itself a
 contribution). Tracked in the [[hls-synthesis-and-optimization]] memory.
 
-### D-20 🔄 Phase 4 throughput optimization — value-faithful parallelization; gather decoder; BRAM-guarded
+### D-20 ✅ Phase 4 throughput optimization — value-faithful parallelization; gather decoder; BRAM-guarded
 **2026-06-28 — owner-authorized (the deferred D-19 phase).** Optimize throughput while finding the
 resource×efficiency balance, no shortcut on the computation. Decisions/findings (full log in
 `hls/OPTIMIZATION_PLAN.md`):
@@ -194,9 +194,15 @@ resource×efficiency balance, no shortcut on the computation. Decisions/findings
   ~4.4× under real-time)**, every step C-sim bit-identical. The **2.5 h csynth is accepted** (front-end
   analysis of the wide unrolls — verified slowness, not a bug: II correct + C-sim PASS), per owner ("慢可接受,
   别为它放弃优化").
-- **BLOCKS (TCN core) held** at the BRAM-expensive frontier (II→1 needs complete partition → ~2× BRAM) until
-  the integrated **post-route** BRAM is known. Long syntheses run **detached** (`Start-Process`), per the
-  [[hls-synthesis-and-optimization]] lesson. Post-route + on-board numbers pending the running build.
+- **BLOCKS (TCN core) held** at the BRAM-expensive frontier (II→1 needs complete partition → ~2× BRAM). Long
+  syntheses run **detached** (`Start-Process`), per the [[hls-synthesis-and-optimization]] lesson.
+- **RESULT (2026-06-28, on real silicon):** post-route **BRAM 76.8 % (LOWER than the 85.3 % baseline), DSP
+  36.6 %, LUT 32.1 %, 200 MHz met (WNS +0.083 ns)**; on-board **286 ms/window (40.8× vs 11.67 s)**, **4.2×
+  under real-time**; quality identical (SI-SDR 6.662 vs 6.66) at silicon-vs-emulator **corr 0.9855 = baseline**.
+  The optimization spent DSP/LUT/FF and *freed* BRAM — the resource×efficiency contribution demonstrated on
+  silicon. **Residual correction:** the small silicon-vs-design residual is pre-existing/unchanged (corr
+  identical), NOT the DDR reads as earlier hypothesized — a quality-negligible silicon-vs-C-sim effect, open
+  for co-sim. BLOCKS II→1 remains a feasible optional ~1.2× (23 % BRAM headroom).
 
 ## Pending owner gates (forward-looking)
 

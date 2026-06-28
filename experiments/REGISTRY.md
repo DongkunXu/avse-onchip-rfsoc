@@ -48,9 +48,30 @@ The whole real-weight AVSE built end-to-end (HLS → P&R → bitstream → board
 | mixed input (baseline) | +4.40 | 1.50 | 0.62 | board beats it by **+2.27 dB** |
 
 A decoder scatter-accumulate pipeline hazard (periodic corruption, C-sim-invisible) was found and fixed
-on-board. A small (~2% rms, −0.22 dB, quality-negligible) silicon-vs-design residual remains — deferred to
-the throughput-optimization phase (un-bursted video DDR reads). Post-route: BRAM 83% / LUT 20% / DSP 17% /
-200 MHz. **The project's central goal is demonstrated on real silicon enhancing speech.**
+on-board (rolled). A small (−0.22 dB, corr 0.9855, quality-negligible) silicon-vs-design residual remains.
+Post-route: BRAM 85% / LUT 19% / DSP 17% / 200 MHz. **The project's central goal is demonstrated on real
+silicon enhancing speech.**
+
+### Phase 4 throughput optimization (2026-06-28) — same single static bitstream, **40.8× faster on-board**
+
+The optimized design (HLS parallelization: on-chip frame/audio caches, unrolled conv/TCN reductions with
+channel-partition + register weights, **gather decoder** replacing the rolled scatter — all C-sim
+bit-identical) rebuilt end-to-end (csynth → P&R → bitstream → board) and run on the **same 16 windows**:
+
+| | SI-SDR | PESQ-WB | STOI | note |
+|---|---:|---:|---:|---|
+| **on-board OPTIMIZED** | **+6.66** | **1.72** | **0.72** | **286 ms/window (40.8× vs the 11.67 s baseline)** |
+| on-board baseline (rolled) | +6.66 | 1.72 | 0.72 | 11.67 s/window — identical quality |
+| emulator (same 16 win) | +6.88 | 1.73 | 0.72 | silicon matches to **corr 0.9855** (= baseline) |
+
+**Post-route (optimized): BRAM 76.8 % (↓ from 85.3 %), DSP 36.6 %, LUT 32.1 %, FF 10.4 %, 200 MHz met
+(WNS +0.083 ns).** Latency 0.269 s csynth (9.5×) / **0.286 s on-board (40.8×) → 4.2× under real-time.** The
+optimization spent DSP/LUT/FF and *freed* BRAM (the binding resource); quality unchanged on silicon. The
+on-board caches removed the un-bursted-DDR penalty (so silicon tracks csynth, not 4.5× over). The ~17%-rel
+silicon-vs-emulator residual (corr 0.9855, quality-negligible) is **unchanged from baseline** — pre-existing,
+NOT the DDR reads (a silicon-vs-C-sim effect; co-sim item). The decoder hazard is now eliminated at the root
+(gather, no scatter). **The whole AVSE runs faster than real-time on one static bitstream, vs the reference's
+4 PCAP bitstreams.**
 
 ## Reference anchors (for comparison, not experiments)
 

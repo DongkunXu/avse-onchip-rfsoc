@@ -52,11 +52,12 @@ the **dataflow and on-chip memory hierarchy** so a *whole* AVSE pipeline co-resi
 3. [`docs/ROADMAP.md`](docs/ROADMAP.md) — the phased plan and where we are now
 4. [`docs/PROGRESS.md`](docs/PROGRESS.md) — the running log of what's done / in progress / next
 
-## Status (updated 2026-06-27)
+## Status (updated 2026-06-28)
 
-**The whole goal is achieved on real hardware: a complete, real-weight, single-static-config AVSE runs on
-the RFSoC 4x2 and enhances speech.** End-to-end: full-data training → deployment-accurate quality →
-value-faithful HLS → P&R → bitstream → on-board measurement.
+**The whole goal is achieved on real hardware AND optimized: a complete, real-weight, single-static-config
+AVSE runs on the RFSoC 4x2, enhances speech, and now runs ~4.2× faster than real-time** (286 ms/window).
+End-to-end: full-data training → deployment-accurate quality → value-faithful HLS → P&R → bitstream →
+on-board measurement → **throughput optimization (40.8× faster on-board, at lower BRAM).**
 
 - **Phase 1 (analytical) — DONE.** Working-set model (`analysis/`) validated against the reference (reproduces
   its 215 % concurrent BRAM) picked **C7 — a Conv-TasNet-style time-domain mask network with NO U-Net skips**
@@ -74,11 +75,20 @@ value-faithful HLS → P&R → bitstream → on-board measurement.
     16-window subset — beats the mixed input by **+2.27 dB** and matches the emulator to **−0.22 dB**
     (corr 0.9855). **The central hypothesis is proven on real silicon, enhancing speech.**
 
-### Open items (the deferred optimization phase)
-- **Throughput / pipelining optimization** (DECISIONS D-19): the video encoder is currently a conservative
-  *rolled* schedule (correct but 11.67 s/window — un-bursted element-wise `video_in` DDR reads). Burst/cache
-  the video frame on-chip + re-pipeline → faster, and likely closes the small (~2 % rms, −0.22 dB,
-  quality-negligible) silicon-vs-design residual. Then a larger on-board eval at speed.
+- **Phase 4 (throughput optimization) — DONE** (DECISIONS D-20; `hls/OPTIMIZATION_PLAN.md`). On-chip
+  frame/audio caches, unrolled conv/TCN reductions (channel-partition + register weights), and a **gather
+  decoder** replacing the rolled scatter — **all C-sim bit-identical** to Phase 3b. **Post-route: BRAM 76.8 %
+  (↓ from 85.3 %), DSP 36.6 %, LUT 32.1 %, 200 MHz met.** **On-board 286 ms/window — 40.8× vs the 11.67 s
+  baseline → 4.2× under real-time**, quality identical (SI-SDR 6.66, corr 0.9855 = baseline). The optimization
+  spent DSP/LUT/FF and *freed* BRAM — the resource×efficiency contribution, on real silicon. The decoder RMW
+  hazard is eliminated at the root (gather).
+
+### Open / optional items
+- The small silicon-vs-emulator residual (corr 0.9855, quality-negligible) is **pre-existing and unchanged**
+  by the optimization (so it is *not* the un-bursted DDR reads, as once hypothesized) — a silicon-vs-C-sim
+  effect, a candidate for a focused co-sim investigation.
+- **Optional further speedup:** ~23 % BRAM headroom remains → the TCN core (BLOCKS) II→1 is feasible for ~1.2×
+  more; held since the design is already well under real-time.
 - Operational: 32 GB host — run heavy jobs one at a time (D-11); board access in
   [memory `board-access`]; full timeline in [`docs/PROGRESS.md`](docs/PROGRESS.md).
 

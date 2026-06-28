@@ -8,7 +8,7 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
-## 2026-06-28 — Phase 4 throughput optimization: HLS-level DONE + value-faithful; ~9.5× faster 🔄
+## 2026-06-28 — Phase 4 throughput optimization DONE: 40.8× faster on-board, BRAM *down*, timing met ✅
 
 **Owner-authorized throughput/efficiency optimization** (the deferred D-19 phase). Full plan + per-step log
 in [`../hls/OPTIMIZATION_PLAN.md`](../hls/OPTIMIZATION_PLAN.md). Every step is **C-sim-verified bit-identical**
@@ -32,9 +32,22 @@ then integrated.
   ≈ 0.27 s/window — ~9.5× vs the 2.564 s baseline, ~4.4× under real-time** — same single-static-config fit,
   spending DSP/LUT headroom while keeping BRAM controlled (the binding resource). On-board, the video frame +
   audio caches replace the un-bursted DDR reads behind the old 11.67 s/window + ~2 % residual.
-- 🔄 **Integrated csynth+export RUNNING (detached)** → ⏭ opt bitstream (`hw/rebuild_vivado_opt.bat`, run alone)
-  → ⏭ on-board latency + quality. **Post-route resources + on-board numbers PENDING** this build. BLOCKS (the
-  TCN core, ~29 % of the optimized design) held at the BRAM-expensive frontier pending real post-route BRAM.
+- ✅ **Integrated csynth+export DONE** (detached, 2.52 h): **0.269 s/window @ 200 MHz**.
+- ✅ **Optimized bitstream built (Vivado P&R) + RUN ON the RFSoC 4x2.** **Post-route: BRAM 829/1080 = 76.8 %
+  (LOWER than the baseline 85.3 %), DSP 36.6 %, LUT 32.1 %, FF 10.4 %; timing MET @ 200 MHz (WNS +0.083 ns).**
+  On-board (same 16-window subset, apples-to-apples): **286 ms/window (3.49 win/s) — 40.8× vs the baseline
+  11.67 s** (the on-chip caches removed the un-bursted-DDR penalty, so silicon tracks the csynth estimate
+  instead of ballooning 4.5×). **Quality identical:** SI-SDR **6.662** / PESQ 1.721 / STOI 0.716 (baseline
+  6.66/1.72/0.72), beats mixed +2.27 dB; silicon-vs-emulator **corr 0.9855 = baseline** → value-faithful on
+  silicon. **The whole AVSE now runs ~4.2× faster than real-time on one static bitstream, using *less* BRAM
+  than before.**
+- ↪ **Residual correction (honest):** earlier I expected the optimization to close the small silicon-vs-design
+  residual (blaming the un-bursted DDR). **Wrong** — corr is identical to baseline (0.9855), so the residual is
+  pre-existing and *not* the DDR/decoder. It's a quality-negligible silicon-vs-C-sim effect (C-sim≡emulator to
+  0.85 %; silicon ~17 % rel, content-dependent) — a co-sim investigation item, out of this phase's scope.
+- ⏭ **Optional next:** BLOCKS (TCN) II→1 is now feasible (post-route BRAM only 76.8 %, ~23 % headroom; ~+64
+  BRAM for ~1.2× more) — held since the design is already well under real-time. Headline docs (README/REGISTRY/
+  RESULTS) updated with the final numbers.
 
 ## 2026-06-27 — B3 real-weight synthesis: diagnosed a 6 h HLS blow-up; audio+video synth FAST + FIT 🔄
 

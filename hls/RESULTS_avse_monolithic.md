@@ -6,6 +6,32 @@ Target xczu48dr, Vitis HLS 2022.2.
 
 ---
 
+## ✅✅ PHASE 4 OPTIMIZED DESIGN (definitive — fastest, on real silicon, 2026-06-28)
+
+Throughput-optimized while staying **C-sim bit-identical** to the deployed Phase-3b design (on-chip
+frame/audio caches, unrolled conv/TCN reductions via channel-partition + register weight-rows, and a
+**gather decoder** replacing the rolled scatter — see `hls/OPTIMIZATION_PLAN.md`, DECISIONS D-20).
+
+| Resource | **post-route (opt)** | Available | **Util** | (Phase-3b post-route) |
+|---|---:|---:|---:|---:|
+| **BRAM tile** | **829** | 1080 | **76.8 %** | 85.3 % |
+| **DSP** | **1563** | 4272 | **36.6 %** | 16.9 % |
+| **LUT** | **136,675** | 425,280 | **32.1 %** | 19.0 % |
+| FF | 88,734 | 850,560 | 10.4 % | 4.9 % |
+
+**Timing MET — 200 MHz, WNS +0.083 ns.** Latency **0.269 s/window csynth (9.5× vs the 2.564 s rolled
+baseline)**; **on-board 0.286 s/window (3.49 win/s) — 40.8× vs the 11.67 s baseline → 4.2× under real-time.**
+
+> **The optimization spent the abundant DSP/LUT/FF and *freed* BRAM** (85.3 % → 76.8 %, the binding
+> resource) — a 40.8× on-board speedup at **lower** BRAM, same single static configuration, timing closed.
+> Quality is **identical on silicon** (SI-SDR 6.662 / PESQ 1.721 / STOI 0.716, vs baseline 6.66/1.72/0.72)
+> and silicon-vs-emulator **corr 0.9855 = baseline** → fully value-faithful, only faster. The on-chip caches
+> removed the un-bursted-DDR penalty (silicon now tracks the csynth estimate). The decoder RMW hazard is
+> eliminated at the root (gather, not scatter). ~23 % BRAM headroom remains (BLOCKS II→1 is an optional
+> further ~1.2×). This is the resource×efficiency contribution, demonstrated on real hardware.
+
+---
+
 ## ✅ REAL-WEIGHT DEPLOYED DESIGN (definitive — Phase 3b)
 
 The trained `p2-c7-full/best.pt` weights, BN-folded into `hls/src/c7_weights.hpp`, with the value-faithful
