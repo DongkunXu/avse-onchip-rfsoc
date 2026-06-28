@@ -95,11 +95,21 @@ FPGA, scored per scene → per bin → **scene-count-weighted** (tools: `prep_bo
 | **weighted (by bin scenes)** | **665** | **4.59** | **1.615** | **0.735** | **1.95** | **+2.64** |
 
 Clean monotonic SNR trend; the model does its work at low/mid SNR (+5–6 dB SI-SDR in the −15…−7.5 bins) and
-≈preserves above ~+5 dB. **FPGA is value-faithful per bin**: the int16 **software (emulator)** on the same
-windows = weighted **4.80 / 1.618 / 0.738**, so FPGA trails by **−0.21 dB** (= the established silicon-vs-
-emulator gap, corr 0.9855). The weighted overall reconciles with the full-dev emulator (4.98) within the 20%
-sampling; proportional sampling → weighted ≡ simple mean (both 4.59). Plot: `hw/board/snr_eval/
-snr_trend_onboard.png`; full JSON: `snr_bin_results.json`. (FP32 per-bin upper bound is a quick GPU add-on.)
+≈preserves above ~+5 dB.
+
+**Three realizations on the identical 665-scene set (scene-count-weighted overall):**
+
+| realization | SI-SDR | PESQ-WB | STOI | vs prev |
+|---|--:|--:|--:|---|
+| **FP32** (original `best.pt`, float inputs) | **5.22** | 1.712 | 0.750 | — (≈ full-dev 5.40, within 20% sampling) |
+| **int16 quant. emulation** (same int16 inputs as the chip) | **4.80** | 1.618 | 0.738 | −0.42 dB (quantization cost) |
+| **on-board FPGA** (the optimized bitstream) | **4.59** | 1.615 | 0.735 | −0.21 dB (= the known silicon-vs-emu gap, corr 0.9855) |
+
+So FP32 → silicon is **−0.63 dB SI-SDR** total, monotonic and consistent at every bin (the FPGA and emulator
+curves nearly overlap → value-faithful across the whole SNR range). 3-panel plot (FP32 / int16-quant dashed /
+on-board, with weighted-average lines): `hw/board/snr_eval/snr_trend_onboard.png`. Full JSON +per-bin for all
+three: `snr_bin_results.json`. Tools: `eval_fp32_snr_bins.py`, `plot_snr_bins.py`. **Note:** FP32 uses
+full-precision inputs (true upper bound); FPGA/emulator use the int16 inputs the chip consumes.
 
 ## Reference anchors (for comparison, not experiments)
 
