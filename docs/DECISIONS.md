@@ -172,6 +172,32 @@ throughput is a deliberate SEPARATE optimization phase** AFTER the end-to-end fl
 in hand — it also strengthens the circuits-architecture narrative (the resource×efficiency trade is itself a
 contribution). Tracked in the [[hls-synthesis-and-optimization]] memory.
 
+### D-20 🔄 Phase 4 throughput optimization — value-faithful parallelization; gather decoder; BRAM-guarded
+**2026-06-28 — owner-authorized (the deferred D-19 phase).** Optimize throughput while finding the
+resource×efficiency balance, no shortcut on the computation. Decisions/findings (full log in
+`hls/OPTIMIZATION_PLAN.md`):
+- **D-19's premise was wrong** (recorded, not hidden): the real csynth report shows the **video encoder is
+  86 % of latency**, not the audio path. Rolling the video was the right call to escape the 6 h synth blow-up,
+  but its stated reason ("audio dominates") was incorrect — the video was the #1 target.
+- **One recipe, applied throughout:** partition the reduction-input buffers on the **channel** dim (cyclic
+  factor matched to the wanted II — 7/16), stage each output's **weight row into registers** (LUT/FF, cheap),
+  and **unroll the reduction**. Channel→bank, spatial→within-bank address makes even the strided shortcut
+  reads conflict-free — avoiding the original 6 h blow-up cause (strided-into-spatial + complete-partitioned
+  big ROMs). Frame (`video_in`) and `audio_in` are **cached on-chip** (burst once) to kill the on-board
+  un-bursted-DDR penalty (the 11.67 s/window + ~2 % residual).
+- **Decoder rewritten scatter→GATHER:** each output computed once from its two analytic contributors
+  (`t=s/16+1,k=s%16` and `t=s/16,k=s%16+16`). Bit-identical to the scatter (acc_t sum is order-independent),
+  but **structurally hazard-free** — this **eliminates the on-board RMW decoder hazard at its root** (the
+  reason the scatter had to be rolled). Supersedes the "roll the scatter" workaround.
+- **Spend DSP/LUT, guard BRAM** (the binding resource): all activation partitions use modest cyclic factors
+  (not `complete`, which doubles BRAM via bank rounding). Result so far: **2.564 s → ~0.27 s csynth (~9.5×,
+  ~4.4× under real-time)**, every step C-sim bit-identical. The **2.5 h csynth is accepted** (front-end
+  analysis of the wide unrolls — verified slowness, not a bug: II correct + C-sim PASS), per owner ("慢可接受,
+  别为它放弃优化").
+- **BLOCKS (TCN core) held** at the BRAM-expensive frontier (II→1 needs complete partition → ~2× BRAM) until
+  the integrated **post-route** BRAM is known. Long syntheses run **detached** (`Start-Process`), per the
+  [[hls-synthesis-and-optimization]] lesson. Post-route + on-board numbers pending the running build.
+
 ## Pending owner gates (forward-looking)
 
 - ~~before Phase 2: D-2~~ → resolved (D-2: time-domain only).

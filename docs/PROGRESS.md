@@ -8,6 +8,34 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-28 — Phase 4 throughput optimization: HLS-level DONE + value-faithful; ~9.5× faster 🔄
+
+**Owner-authorized throughput/efficiency optimization** (the deferred D-19 phase). Full plan + per-step log
+in [`../hls/OPTIMIZATION_PLAN.md`](../hls/OPTIMIZATION_PLAN.md). Every step is **C-sim-verified bit-identical**
+to the validated baseline (value-faithful — no shortcut on the computation), tuned on fast standalone synths
+then integrated.
+
+- ✅ **Corrected D-19's premise from the real csynth report:** the **video encoder was 86 % of latency**
+  (2.215 s of 2.564 s), *not* the audio path. Rolling the video was right to escape the 6 h blow-up, but its
+  stated reason was wrong — the video was exactly the #1 target.
+- ✅ **O-1 video frame cache** (burst-load each 96×96 on-chip; conv reads BRAM not strided DDR): 2.564→2.035 s.
+- ✅ **O-2a CONV0** (7×7 kernel unrolled, fbuf 49-bank partition, staged weights → II 49→1): →1.504 s.
+- ✅ **O-2b 6 pointwise/shortcut convs** (channel-dim cyclic-16 partition + register weight-rows + unrolled
+  reductions → II 4–6; strided shortcut reads made conflict-free): →**0.530 s** (under real-time). csynth takes
+  2.5 h (front-end analysis of the wide unrolls — verified *slowness, not a bug*: II correct, C-sim PASS;
+  accepted per owner).
+- ✅ **O-3a/b/c audio** (69.5M→17.2M cyc, 0.347→0.086 s): IN1x1/OUT1x1 II→4/8 (+MASK auto→2); BOT II→8;
+  ENC cached + unrolled II→2; **decoder rewritten scatter→GATHER** — bit-identical but **structurally
+  hazard-free**, so the on-board RMW decoder hazard (which forced the rolled workaround) is **eliminated at
+  the root**, 7.38M→0.31M.
+- ✅ **Integrated monolith C-sim PASS** (rel_rms 8.538e-3, bit-identical to baseline). **csynth projection
+  ≈ 0.27 s/window — ~9.5× vs the 2.564 s baseline, ~4.4× under real-time** — same single-static-config fit,
+  spending DSP/LUT headroom while keeping BRAM controlled (the binding resource). On-board, the video frame +
+  audio caches replace the un-bursted DDR reads behind the old 11.67 s/window + ~2 % residual.
+- 🔄 **Integrated csynth+export RUNNING (detached)** → ⏭ opt bitstream (`hw/rebuild_vivado_opt.bat`, run alone)
+  → ⏭ on-board latency + quality. **Post-route resources + on-board numbers PENDING** this build. BLOCKS (the
+  TCN core, ~29 % of the optimized design) held at the BRAM-expensive frontier pending real post-route BRAM.
+
 ## 2026-06-27 — B3 real-weight synthesis: diagnosed a 6 h HLS blow-up; audio+video synth FAST + FIT 🔄
 
 **The first real-weight monolithic csynth ran ~6 h without producing a report and was lost when the session
