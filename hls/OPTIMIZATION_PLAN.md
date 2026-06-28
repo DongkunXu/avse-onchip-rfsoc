@@ -99,6 +99,23 @@ Work in a **separate** build project (`c7_avse_opt`) so the baseline `c7_avse` s
   bitstream → board; measure on-board latency + quality on a larger subset. Update docs/REGISTRY/
   DECISIONS (supersede D-19's latency claim) / memory.
 
+## Future work (deferred, post-checkpoint 2026-06-28)
+
+The throughput phase reached a clean checkpoint (40.8× on-board, 4.2× under real-time, BRAM *down*,
+value-faithful). Two directions are deliberately left as future work:
+
+1. **BLOCKS (TCN core) II→1** — the one remaining BRAM-expensive frontier. ~23 % post-route BRAM
+   headroom remains, so IN1x1 (y complete-partition) + OUT1x1 (hd factor-32) → II 4/8 → 1/4 is feasible
+   for **~1.2× more** latency (~+64 BRAM). Held because the design is already well under real-time;
+   marginal gain vs another ~3 h csynth + P&R + board cycle.
+2. **A more streaming / low-latency on-chip structure.** The current design is *windowed* (1.2 s
+   windows, processed whole; latency = one window). A genuinely **streaming** datapath — process the
+   audio/video as a sample/frame stream with a small ring buffer, overlap-add on the fly, so the
+   end-to-end latency is a few ms (one hop / one frame) rather than 1.2 s — would make it a true
+   **low-latency real-time** AVSE. This is an architecture change (streaming encoder/TCN with causal or
+   bounded-lookahead dilations, streaming decoder), not a pragma pass — its own design phase, and a
+   strong second circuits-architecture contribution (throughput *and* latency).
+
 ## Log
 - _(2026-06-27)_ Phase opened. Baseline captured above. Starting O-1.
 - _(2026-06-27)_ **O-1 done** (frame cache). C-sim PASS (worst rel_rms 8.54e-3, value-identical).
