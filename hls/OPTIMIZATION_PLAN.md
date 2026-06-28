@@ -140,3 +140,10 @@ Work in a **separate** build project (`c7_avse_opt`) so the baseline `c7_avse` s
   as csynth+export **detached** (`hls/build/int_run.bat` → `run_csynth_export_avse_opt.tcl`, writes
   `int2_csynth.flag`); polling for completion. Export goes to `c7_avse_opt/sol1/impl/ip` for the opt
   bitstream (`hw/rebuild_vivado_opt.bat`).
+- _(2026-06-28)_ **Integrated csynth+export DONE** (detached, 2.52 h, survived a session boundary).
+  **Monolith latency = 53.74M cyc = 0.269 s/window @ 200 MHz — 9.5× vs the 2.564 s baseline, 4.5× under
+  real-time.** (video_encoder 36.25M / audio_core 17.2M / VPROJ+VUP 0.28M.) csynth-est resources: BRAM
+  **1687 (78%)**, DSP 1565 (36%), LUT 330k (77% — HLS over-counts pre-route, drops hard at P&R), FF 18%.
+  IP exported (`xilinx_com_hls_c7_avse_top_1_0.zip`). **Opt bitstream build RUNNING detached**
+  (`rebuild_vivado_opt.bat`: BD → synth → P&R → bitstream → overlay; writes `hw/rebuild_done.flag`).
+  Watch post-route **BRAM** (~91% projected — fits but tight; the binding resource).
