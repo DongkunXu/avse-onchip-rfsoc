@@ -43,13 +43,16 @@ def main():
     ap.add_argument("--windows", default="board_windows.npz")
     ap.add_argument("--out", default="board_outputs.npz")
     ap.add_argument("--ip", default="avse_0", help="IP instance name in the overlay")
+    ap.add_argument("--zero-video", action="store_true",
+                    help="VISUAL ABLATION: feed an all-zero video buffer (black screen) instead of the real "
+                         "frames. The video_in array is then optional in the .npz (audio-only chunks).")
     args = ap.parse_args()
 
     data = np.load(args.windows)
     audio_in_all = data["audio_in"]      # [N,19200] int16
-    video_in_all = data["video_in"]      # [N,30,96,96] int16
+    video_in_all = None if args.zero_video else data["video_in"]   # [N,30,96,96] int16
     N = audio_in_all.shape[0]
-    print(f"loaded {N} windows from {args.windows}")
+    print(f"loaded {N} windows from {args.windows}" + ("  [ZERO-VIDEO ablation]" if args.zero_video else ""))
 
     ov = Overlay(args.overlay, download=True)
     ip = getattr(ov, args.ip)
@@ -63,12 +66,20 @@ def main():
     write64(mm, OFF_VIDEO_IN, b_video_in.physical_address)
     write64(mm, OFF_AUDIO_OUT, b_audio_out.physical_address)
 
+    if args.zero_video:
+        # ablation: zero the video DDR buffer ONCE; it is never rewritten, so the IP reads a black
+        # frame (int16 0 == float 0, same "black screen" as the FP32 torch.zeros ablation) every window.
+        b_video_in[:] = 0
+        b_video_in.flush()
+
     outputs = np.zeros((N, T), dtype=np.int16)
     t_compute = []
     for i in range(N):
         b_audio_in[:] = audio_in_all[i]
-        b_video_in[:] = video_in_all[i]
-        b_audio_in.flush(); b_video_in.flush()
+        b_audio_in.flush()
+        if not args.zero_video:
+            b_video_in[:] = video_in_all[i]
+            b_video_in.flush()
 
         t0 = time.time()
         mm.write(AP_CTRL, 1)                       # ap_start

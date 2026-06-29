@@ -8,24 +8,29 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
-## 2026-06-29 — Visual ablation: the model is genuinely audio-**visual** ✅
+## 2026-06-29 — Visual ablation, FP32 *and* on-chip FPGA: genuinely audio-**visual**, and it holds on silicon ✅
 
-Owner asked to confirm (and visualize) the **video contribution** — a simple pure-Python version first:
-zero the video, run FP32, score per SNR bin on the **same 665-scene set** (comparability), judge from all
-three metrics (not one). Tools: `tools/eval_video_ablation_snr_bins.py`, `tools/plot_video_ablation.py`.
+Owner asked to confirm (and visualize) the **video contribution** — first pure-Python, then the **same on the
+FPGA**. A/B on the **same 665-scene SNR-bin set** (comparability), judged from all three metrics (not one).
+Tools: `eval_video_ablation_snr_bins.py`, `prep_board_novideo_chunks.py`, `run_fpga.py --zero-video`,
+`score_board_novideo.py`, `plot_video_ablation.py {--realm fp32|fpga|both}`.
 
-- ✅ **A/B in one process** (airtight): each window forwarded twice with the **same audio** — real video vs
-  video **zeroed** (`torch.zeros_like` = black screen; keeps only the learned static prior → conservative,
-  and reproducible on the board by zeroing `video_in`). With-video arm **reproduces the stored FP32 row to
-  3 dp** (5.216/1.712/0.750) — sanity check passed.
-- ✅ **Clear, consistent contribution on all three metrics, every bin:** weighted **SI-SDR 5.22→1.29
-  (−3.93 dB), PESQ 1.712→1.463 (−0.249), STOI 0.750→0.660 (−0.090)**. Gap *widens with SNR* (−2.3…−2.7 dB at
-  the lowest bins → −4.5…−7.3 dB above +2.5 dB). No cherry-picking — degradation is monotone and present
-  everywhere. Per-bin table in [`../experiments/REGISTRY.md`](../experiments/REGISTRY.md).
-- ✅ **3-panel plot** `hw/board/snr_eval/video_ablation.png` (with-video solid vs video-zeroed dashed,
-  weighted-average lines, shaded = visual contribution) + `video_ablation_results.json`.
-- 📌 Standing note recorded: ongoing eval defaults to **FP32-Python or the real board, not the int16
-  emulator** unless explicitly named.
+- ✅ **FP32 (Python) A/B in one process** (airtight): each window forwarded twice, same audio — real video vs
+  video **zeroed** (`torch.zeros_like` = black screen; keeps only the learned static prior → conservative).
+  With-video arm **reproduces the stored FP32 row to 3 dp** (5.216/1.712/0.750). Weighted **SI-SDR 5.22→1.29
+  (−3.93 dB), PESQ 1.712→1.463 (−0.249), STOI 0.750→0.660 (−0.090)**.
+- ✅ **On-chip FPGA A/B** on the **same optimized bitstream**: video DDR buffer zeroed on-board (int16 0 ==
+  float 0 == same black screen), same audio re-fed (audio-only chunks → tiny upload), 4917 windows @ 286 ms =
+  ~27.5 min board time. With-video arm **reproduces the stored board row to 3 dp** (4.592/1.615/0.735).
+  Weighted **SI-SDR 4.59→0.53 (−4.06 dB), PESQ 1.615→1.372 (−0.243), STOI 0.735→0.637 (−0.098)**.
+- ✅ **Contribution preserved on real silicon:** FPGA Δ ≈ FP32 Δ (−4.06 vs −3.93 dB, −0.243 vs −0.249 PESQ,
+  −0.098 vs −0.090 STOI). Large, consistent on all three metrics, present in **every** bin, gap *widens with
+  SNR* (−2…−2.7 dB low bins → −4.5…−8 dB above +2.5 dB). Per-bin tables in
+  [`../experiments/REGISTRY.md`](../experiments/REGISTRY.md). Plots: `hw/board/snr_eval/{video_ablation,
+  board_video_ablation,video_ablation_combined}.png`; JSON `video_ablation_results.json` +
+  `board_video_ablation_results.json`.
+- 📌 Standing note: ongoing eval defaults to **FP32-Python or the real board, not the int16 emulator** unless
+  explicitly named. `run_fpga.py` gained a `--zero-video` flag (normal path byte-identical).
 
 ## 2026-06-28 — Phase 4 throughput optimization DONE: 40.8× faster on-board, BRAM *down*, timing met ✅
 

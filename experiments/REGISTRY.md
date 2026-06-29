@@ -111,18 +111,25 @@ on-board, with weighted-average lines): `hw/board/snr_eval/snr_trend_onboard.png
 three: `snr_bin_results.json`. Tools: `eval_fp32_snr_bins.py`, `plot_snr_bins.py`. **Note:** FP32 uses
 full-precision inputs (true upper bound); FPGA/emulator use the int16 inputs the chip consumes.
 
-### Visual ablation — does the model actually use the video? (2026-06-29, FP32/Python)
+### Visual ablation — does the model actually use the video? (2026-06-29) — FP32 *and* on-chip FPGA
 
 To confirm the **visual modality contributes** (not an audio-only network in disguise), an A/B on the
-**identical 665-scene SNR-bin set**: for every window, forward the FP32 model (`best.pt`) twice with the
-**same audio** — once with the real video frames, once with the video **zeroed** (`torch.zeros_like`, a
-"black screen": time-varying lip motion removed, only the model's learned static prior kept — the
-conservative ablation, and exactly reproducible on the board by zeroing `video_in`). Same windowing /
-normalization / metrics / per-scene→bin→scene-count-weighted aggregation as everywhere else. The with-video
-arm **reproduces the stored FP32 row to 3 decimals** (5.216/1.712/0.750) — built-in sanity check.
-Tools: `eval_video_ablation_snr_bins.py`, `plot_video_ablation.py`. Plot: `hw/board/snr_eval/video_ablation.png`.
+**identical 665-scene SNR-bin set**, done in **both realms**: for every window, run the model twice with the
+**same audio** — once with the real video, once with the video **zeroed** (a "black screen": time-varying lip
+motion removed, only the learned static prior kept — the conservative ablation). Same windowing /
+normalization / metrics / per-scene→bin→scene-count-weighted aggregation as everywhere else. Both with-video
+arms **reproduce their stored rows to 3 decimals** (FP32 5.216/1.712/0.750; FPGA 4.592/1.615/0.735) —
+built-in sanity checks.
+- **FP32 (Python):** `torch.zeros_like` video. Tools `eval_video_ablation_snr_bins.py`, `plot_video_ablation.py --realm fp32`.
+- **On-chip (FPGA):** the **same optimized bitstream**, video DDR buffer zeroed on-board (int16 0 == float 0 ==
+  the same black screen), same audio re-fed. Driver `run_fpga.py --zero-video`; tools
+  `prep_board_novideo_chunks.py`, `run_board_chunks.sh … --zero-video`, `score_board_novideo.py`,
+  `plot_video_ablation.py --realm fpga`. 4917 windows @ 286 ms = ~27.5 min board time. Outputs differ 25–47 %
+  from with-video per window (the flag genuinely changes the compute).
 
-| input SNR (dB) | n | SI-SDR (vid→0) | Δ | PESQ (vid→0) | Δ | STOI (vid→0) | Δ |
+**FP32 (Python) — with video → video zeroed:**
+
+| input SNR (dB) | n | SI-SDR | Δ | PESQ | Δ | STOI | Δ |
 |---|--:|--:|--:|--:|--:|--:|--:|
 | [−15,−12.5] | 36 | −5.62→−8.30 | −2.68 | 1.163→1.091 | −0.072 | 0.544→0.478 | −0.066 |
 | [−12.5,−10] | 38 | −4.64→−6.94 | −2.30 | 1.156→1.092 | −0.064 | 0.567→0.518 | −0.049 |
@@ -134,14 +141,38 @@ Tools: `eval_video_ablation_snr_bins.py`, `plot_video_ablation.py`. Plot: `hw/bo
 | [2.5,5] | 86 | 8.83→3.33 | −5.49 | 1.948→1.526 | −0.422 | 0.815→0.682 | −0.133 |
 | [5,7.5] | 45 | 14.25→9.67 | −4.58 | 2.418→2.045 | −0.373 | 0.890→0.829 | −0.061 |
 | [7.5,10] | 36 | 16.48→9.20 | −7.28 | 2.548→1.987 | −0.561 | 0.921→0.828 | −0.093 |
-| **weighted (by bin scenes)** | **665** | **5.22→1.29** | **−3.93** | **1.712→1.463** | **−0.249** | **0.750→0.660** | **−0.090** |
+| **weighted** | **665** | **5.22→1.29** | **−3.93** | **1.712→1.463** | **−0.249** | **0.750→0.660** | **−0.090** |
 
-**The visual contribution is large, consistent, and shows on all three metrics in every single bin** (no
-cherry-picking): removing video costs **−3.93 dB SI-SDR / −0.249 PESQ / −0.090 STOI** weighted. The gap
-*widens with SNR* (−2.3…−2.7 dB in the lowest bins → −4.5…−7.3 dB above +2.5 dB): when the audio is less
-catastrophically corrupted the lip stream is more fully exploitable, whereas at very low SNR even AV is hard.
-This confirms the model is genuinely audio-**visual**. (Board-side ablation — zero the int16 `video_in` and
-re-run the bitstream — is a straightforward follow-up if a silicon-side number is wanted.)
+**On-chip FPGA (same bitstream) — with video → video zeroed:**
+
+| input SNR (dB) | n | SI-SDR | Δ | PESQ | Δ | STOI | Δ |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| [−15,−12.5] | 36 | −5.72→−8.16 | −2.44 | 1.150→1.091 | −0.059 | 0.531→0.475 | −0.056 |
+| [−12.5,−10] | 38 | −4.74→−6.73 | −1.99 | 1.139→1.098 | −0.041 | 0.553→0.510 | −0.042 |
+| [−10,−7.5] | 82 | 0.51→−2.07 | −2.57 | 1.337→1.229 | −0.109 | 0.629→0.565 | −0.064 |
+| [−7.5,−5] | 89 | 1.72→−1.72 | −3.44 | 1.449→1.271 | −0.178 | 0.687→0.590 | −0.097 |
+| [−5,−2.5] | 81 | 4.27→0.94 | −3.33 | 1.497→1.341 | −0.156 | 0.746→0.654 | −0.093 |
+| [−2.5,0] | 85 | 6.10→1.99 | −4.11 | 1.665→1.407 | −0.258 | 0.788→0.676 | −0.112 |
+| [0,2.5] | 87 | 6.34→1.76 | −4.59 | 1.705→1.417 | −0.288 | 0.776→0.661 | −0.115 |
+| [2.5,5] | 86 | 7.91→2.26 | −5.65 | 1.814→1.421 | −0.394 | 0.800→0.653 | −0.147 |
+| [5,7.5] | 45 | 13.31→8.32 | −4.99 | 2.223→1.827 | −0.396 | 0.876→0.793 | −0.084 |
+| [7.5,10] | 36 | 15.30→7.22 | −8.08 | 2.322→1.714 | −0.608 | 0.904→0.786 | −0.118 |
+| **weighted** | **665** | **4.59→0.53** | **−4.06** | **1.615→1.372** | **−0.243** | **0.735→0.637** | **−0.098** |
+
+**Visual contribution (weighted Δ, removing video):**
+
+| realm | ΔSI-SDR | ΔPESQ | ΔSTOI |
+|---|--:|--:|--:|
+| FP32 (Python) | **−3.93 dB** | **−0.249** | **−0.090** |
+| on-chip FPGA  | **−4.06 dB** | **−0.243** | **−0.098** |
+
+**The visual contribution is large, consistent on all three metrics, present in every single bin (no
+cherry-picking), and — crucially — fully preserved on real silicon** (FPGA Δ ≈ FP32 Δ to within ~0.1 dB /
+0.006 PESQ / 0.008 STOI). The gap *widens with SNR* (−2…−2.7 dB in the lowest bins → −4.5…−8 dB above
++2.5 dB): when the audio is less catastrophically corrupted the lip stream is more fully exploitable, whereas
+at very low SNR even AV is hard. **The model is genuinely audio-visual, and that benefit survives quantization
++ the silicon datapath.** Plots: `hw/board/snr_eval/{video_ablation,board_video_ablation,video_ablation_combined}.png`.
+Full per-bin JSON: `video_ablation_results.json` (FP32), `board_video_ablation_results.json` (FPGA).
 
 ## Reference anchors (for comparison, not experiments)
 

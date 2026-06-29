@@ -65,8 +65,10 @@ on-board measurement → **throughput optimization (40.8× faster on-board, at l
 - **Phase 2 (PyTorch) — DONE.** C7 trained on the full data (`p2-c7-full`): **full-dev SI-SDR +5.40 / PESQ
   1.727 / STOI 0.754** (FP32), *above* the FP32 reference (+3.99) at a **0.017 MB** working set (1/240 of the
   reference). A **visual ablation** (zero the video, same 665-scene SNR-bin set, all three metrics) confirms the
-  model is genuinely audio-**visual**: removing video costs **−3.93 dB SI-SDR / −0.249 PESQ / −0.090 STOI**
-  (weighted), degrading in *every* SNR bin (`experiments/REGISTRY.md`; plot `hw/board/snr_eval/video_ablation.png`).
+  model is genuinely audio-**visual** — run in **both realms**: FP32 removing video costs **−3.93 dB SI-SDR /
+  −0.249 PESQ / −0.090 STOI** (weighted), and **on the same FPGA bitstream −4.06 / −0.243 / −0.098** — i.e. the
+  video benefit is **preserved on real silicon**, degrading in *every* SNR bin (`experiments/REGISTRY.md`;
+  plots `hw/board/snr_eval/{video_ablation,board_video_ablation,video_ablation_combined}.png`).
 - **Phase 3a (HLS fit, placeholder weights) — DONE.** Established the structure fits one static config.
 - **Phase 3b (real-weight deployment) — DONE.**
   - **Deployment-accurate quality** (int16 fixed-point emulator, C-sim-validated): **SI-SDR 4.98 / PESQ 1.63 /

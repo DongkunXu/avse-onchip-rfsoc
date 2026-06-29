@@ -2,10 +2,12 @@
 # run_board_chunks.sh — drive the SNR-bin eval chunks through the optimized FPGA bitstream.
 # For each chunk_*_windows.npz in LOCAL_DIR: scp to the board, run run_fpga.py, scp the outputs back.
 # Resumable: skips a chunk whose *_outputs.npz already exists locally.
-#   bash tools/run_board_chunks.sh <LOCAL_DIR> [REMOTE_SUBDIR]
+#   bash tools/run_board_chunks.sh <LOCAL_DIR> [REMOTE_SUBDIR] [EXTRA_RUN_ARGS]
+# EXTRA_RUN_ARGS is appended to the run_fpga.py command (e.g. "--zero-video" for the visual ablation).
 set -u
-LOCAL_DIR="${1:?usage: run_board_chunks.sh <local_dir> [remote_subdir]}"
+LOCAL_DIR="${1:?usage: run_board_chunks.sh <local_dir> [remote_subdir] [extra_run_args]}"
 REMOTE_SUB="${2:-snr}"
+RUN_ARGS="${3:-}"
 IP=172.26.206.133
 HK="SHA256:vrFwqkqWIfyDZ1S66aJb1gLy59wx3LakOqhnyQJEOhg"
 RBASE="/home/xilinx/avse_onchip"
@@ -23,7 +25,7 @@ for w in $chunks; do
   if [ -f "$out" ]; then echo "[$i/$n] $base outputs exist, skip"; continue; fi
   echo "[$i/$n] $base -> board ($(du -h "$w" | cut -f1))"
   $PS "$w" "xilinx@$IP:$RDIR/${base}_windows.npz" >/dev/null || { echo "  scp up FAILED"; exit 1; }
-  $PL "echo xilinx | sudo -S bash -c 'source /etc/profile.d/pynq_venv.sh; source /etc/profile.d/xrt_setup.sh 2>/dev/null; cd $RBASE; python3 run_fpga.py --overlay avse_sys.bit --windows $RDIR/${base}_windows.npz --out $RDIR/${base}_outputs.npz'" 2>&1 | grep -aE "mean compute|loaded|Error|Traceback" | tail -3
+  $PL "echo xilinx | sudo -S bash -c 'source /etc/profile.d/pynq_venv.sh; source /etc/profile.d/xrt_setup.sh 2>/dev/null; cd $RBASE; python3 run_fpga.py --overlay avse_sys.bit --windows $RDIR/${base}_windows.npz --out $RDIR/${base}_outputs.npz $RUN_ARGS'" 2>&1 | grep -aE "mean compute|loaded|Error|Traceback" | tail -3
   $PS "xilinx@$IP:$RDIR/${base}_outputs.npz" "$out" >/dev/null || { echo "  scp down FAILED"; exit 1; }
   $PL "rm -f $RDIR/${base}_windows.npz" >/dev/null 2>&1
   echo "  done ($(( $(date +%s) - t0 ))s elapsed)"

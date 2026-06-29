@@ -64,6 +64,8 @@ hw/board/board_*.npz
 # stratified SNR-bin eval working data (regenerable: prep_board_snr_bins.py + run_board_chunks.sh + score)
 hw/board/snr_eval/
 hw/board/snr_smoke/
+# on-chip visual-ablation working data (regenerable: prep_board_novideo_chunks.py + run_board_chunks.sh)
+hw/board/snr_eval_novideo/
 hw/*.log
 hw/*.out
 hw/*.err
