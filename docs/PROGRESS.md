@@ -8,6 +8,25 @@ Status legend: ✅ done · 🔄 in progress · ⏭ next · ⛔ blocked
 
 ---
 
+## 2026-06-29 — Visual ablation: the model is genuinely audio-**visual** ✅
+
+Owner asked to confirm (and visualize) the **video contribution** — a simple pure-Python version first:
+zero the video, run FP32, score per SNR bin on the **same 665-scene set** (comparability), judge from all
+three metrics (not one). Tools: `tools/eval_video_ablation_snr_bins.py`, `tools/plot_video_ablation.py`.
+
+- ✅ **A/B in one process** (airtight): each window forwarded twice with the **same audio** — real video vs
+  video **zeroed** (`torch.zeros_like` = black screen; keeps only the learned static prior → conservative,
+  and reproducible on the board by zeroing `video_in`). With-video arm **reproduces the stored FP32 row to
+  3 dp** (5.216/1.712/0.750) — sanity check passed.
+- ✅ **Clear, consistent contribution on all three metrics, every bin:** weighted **SI-SDR 5.22→1.29
+  (−3.93 dB), PESQ 1.712→1.463 (−0.249), STOI 0.750→0.660 (−0.090)**. Gap *widens with SNR* (−2.3…−2.7 dB at
+  the lowest bins → −4.5…−7.3 dB above +2.5 dB). No cherry-picking — degradation is monotone and present
+  everywhere. Per-bin table in [`../experiments/REGISTRY.md`](../experiments/REGISTRY.md).
+- ✅ **3-panel plot** `hw/board/snr_eval/video_ablation.png` (with-video solid vs video-zeroed dashed,
+  weighted-average lines, shaded = visual contribution) + `video_ablation_results.json`.
+- 📌 Standing note recorded: ongoing eval defaults to **FP32-Python or the real board, not the int16
+  emulator** unless explicitly named.
+
 ## 2026-06-28 — Phase 4 throughput optimization DONE: 40.8× faster on-board, BRAM *down*, timing met ✅
 
 **Owner-authorized throughput/efficiency optimization** (the deferred D-19 phase). Full plan + per-step log

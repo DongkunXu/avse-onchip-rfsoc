@@ -111,6 +111,38 @@ on-board, with weighted-average lines): `hw/board/snr_eval/snr_trend_onboard.png
 three: `snr_bin_results.json`. Tools: `eval_fp32_snr_bins.py`, `plot_snr_bins.py`. **Note:** FP32 uses
 full-precision inputs (true upper bound); FPGA/emulator use the int16 inputs the chip consumes.
 
+### Visual ablation — does the model actually use the video? (2026-06-29, FP32/Python)
+
+To confirm the **visual modality contributes** (not an audio-only network in disguise), an A/B on the
+**identical 665-scene SNR-bin set**: for every window, forward the FP32 model (`best.pt`) twice with the
+**same audio** — once with the real video frames, once with the video **zeroed** (`torch.zeros_like`, a
+"black screen": time-varying lip motion removed, only the model's learned static prior kept — the
+conservative ablation, and exactly reproducible on the board by zeroing `video_in`). Same windowing /
+normalization / metrics / per-scene→bin→scene-count-weighted aggregation as everywhere else. The with-video
+arm **reproduces the stored FP32 row to 3 decimals** (5.216/1.712/0.750) — built-in sanity check.
+Tools: `eval_video_ablation_snr_bins.py`, `plot_video_ablation.py`. Plot: `hw/board/snr_eval/video_ablation.png`.
+
+| input SNR (dB) | n | SI-SDR (vid→0) | Δ | PESQ (vid→0) | Δ | STOI (vid→0) | Δ |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| [−15,−12.5] | 36 | −5.62→−8.30 | −2.68 | 1.163→1.091 | −0.072 | 0.544→0.478 | −0.066 |
+| [−12.5,−10] | 38 | −4.64→−6.94 | −2.30 | 1.156→1.092 | −0.064 | 0.567→0.518 | −0.049 |
+| [−10,−7.5] | 82 | 1.12→−1.51 | −2.63 | 1.397→1.284 | −0.113 | 0.652→0.587 | −0.065 |
+| [−7.5,−5] | 89 | 2.16→−1.12 | −3.29 | 1.512→1.327 | −0.185 | 0.702→0.613 | −0.089 |
+| [−5,−2.5] | 81 | 4.70→1.55 | −3.15 | 1.570→1.413 | −0.157 | 0.762→0.675 | −0.086 |
+| [−2.5,0] | 85 | 6.88→2.81 | −4.07 | 1.771→1.506 | −0.265 | 0.803→0.696 | −0.108 |
+| [0,2.5] | 87 | 6.95→2.61 | −4.34 | 1.813→1.512 | −0.301 | 0.790→0.686 | −0.104 |
+| [2.5,5] | 86 | 8.83→3.33 | −5.49 | 1.948→1.526 | −0.422 | 0.815→0.682 | −0.133 |
+| [5,7.5] | 45 | 14.25→9.67 | −4.58 | 2.418→2.045 | −0.373 | 0.890→0.829 | −0.061 |
+| [7.5,10] | 36 | 16.48→9.20 | −7.28 | 2.548→1.987 | −0.561 | 0.921→0.828 | −0.093 |
+| **weighted (by bin scenes)** | **665** | **5.22→1.29** | **−3.93** | **1.712→1.463** | **−0.249** | **0.750→0.660** | **−0.090** |
+
+**The visual contribution is large, consistent, and shows on all three metrics in every single bin** (no
+cherry-picking): removing video costs **−3.93 dB SI-SDR / −0.249 PESQ / −0.090 STOI** weighted. The gap
+*widens with SNR* (−2.3…−2.7 dB in the lowest bins → −4.5…−7.3 dB above +2.5 dB): when the audio is less
+catastrophically corrupted the lip stream is more fully exploitable, whereas at very low SNR even AV is hard.
+This confirms the model is genuinely audio-**visual**. (Board-side ablation — zero the int16 `video_in` and
+re-run the bitstream — is a straightforward follow-up if a silicon-side number is wanted.)
+
 ## Reference anchors (for comparison, not experiments)
 
 | name | SI-SDR | PESQ-WB | STOI | note |
