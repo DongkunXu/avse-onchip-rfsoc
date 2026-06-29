@@ -64,10 +64,12 @@ bit-identical) rebuilt end-to-end (csynth → P&R → bitstream → board) and r
 | on-board baseline (rolled) | +6.66 | 1.72 | 0.72 | 11.67 s/window — identical quality |
 | emulator (same 16 win) | +6.88 | 1.73 | 0.72 | silicon matches to **corr 0.9855** (= baseline) |
 
-**Post-route (optimized): BRAM 76.8 % (↓ from 85.3 %), DSP 36.6 %, LUT 32.1 %, FF 10.4 %, 200 MHz met
-(WNS +0.083 ns).** Latency 0.269 s csynth (9.5×) / **0.286 s on-board (40.8×) → 4.2× under real-time.** The
-optimization spent DSP/LUT/FF and *freed* BRAM (the binding resource); quality unchanged on silicon. The
-on-board caches removed the un-bursted-DDR penalty (so silicon tracks csynth, not 4.5× over). The ~17%-rel
+**Post-route (optimized): BRAM 76.8 % (↓ from 85.3 %), DSP 36.6 %, LUT 32.1 %, FF 10.4 %; timing met at
+187.5 MHz (`clk_pl_0` 5.333 ns, WNS +0.083 ns).** Tool reports tracked in `hls/reports/` + `hw/reports/`.
+Cycle count 9.5× below baseline (512.8M→53.7M cyc); **on-board 0.286 s/window (40.8×) → 4.2× under real-time**
+— cycle-exact (53.7M × 5.333 ns = 286 ms). The optimized critical path (5.250 ns) does not close 200 MHz; the
+0.269 s csynth figure was the HLS estimate at its 5 ns target. The optimization spent DSP/LUT/FF and *freed*
+BRAM (the binding resource); quality unchanged on silicon. The ~17%-rel
 silicon-vs-emulator residual (corr 0.9855, quality-negligible) is **unchanged from baseline** — pre-existing,
 NOT the DDR reads (a silicon-vs-C-sim effect; co-sim item). The decoder hazard is now eliminated at the root
 (gather, no scatter). **The whole AVSE runs faster than real-time on one static bitstream, vs the reference's

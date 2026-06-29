@@ -56,12 +56,16 @@ then integrated.
   ≈ 0.27 s/window — ~9.5× vs the 2.564 s baseline, ~4.4× under real-time** — same single-static-config fit,
   spending DSP/LUT headroom while keeping BRAM controlled (the binding resource). On-board, the video frame +
   audio caches replace the un-bursted DDR reads behind the old 11.67 s/window + ~2 % residual.
-- ✅ **Integrated csynth+export DONE** (detached, 2.52 h): **0.269 s/window @ 200 MHz**.
+- ✅ **Integrated csynth+export DONE** (detached, 2.52 h): **53.7M cycles** = 0.269 s/window at the 5 ns /
+  200 MHz HLS target (the implemented bitstream clocks lower — see below).
 - ✅ **Optimized bitstream built (Vivado P&R) + RUN ON the RFSoC 4x2.** **Post-route: BRAM 829/1080 = 76.8 %
-  (LOWER than the baseline 85.3 %), DSP 36.6 %, LUT 32.1 %, FF 10.4 %; timing MET @ 200 MHz (WNS +0.083 ns).**
+  (LOWER than the baseline 85.3 %), DSP 36.6 %, LUT 32.1 %, FF 10.4 %; timing MET at 187.5 MHz (`clk_pl_0`
+  5.333 ns, WNS +0.083 ns).** (The optimized critical path is 5.250 ns → it does **not** close 200 MHz; the
+  optimization traded a slightly longer path for 9.5× fewer cycles. Tool reports: `hls/reports/`, `hw/reports/`.)
   On-board (same 16-window subset, apples-to-apples): **286 ms/window (3.49 win/s) — 40.8× vs the baseline
-  11.67 s** (the on-chip caches removed the un-bursted-DDR penalty, so silicon tracks the csynth estimate
-  instead of ballooning 4.5×). **Quality identical:** SI-SDR **6.662** / PESQ 1.721 / STOI 0.716 (baseline
+  11.67 s** — the board is **cycle-exact** (53.7M cyc × 5.333 ns = 286 ms): the on-chip caches removed the
+  un-bursted-DDR penalty, so silicon equals the cycle count at the real clock instead of ballooning 4.5×.
+  **Quality identical:** SI-SDR **6.662** / PESQ 1.721 / STOI 0.716 (baseline
   6.66/1.72/0.72), beats mixed +2.27 dB; silicon-vs-emulator **corr 0.9855 = baseline** → value-faithful on
   silicon. **The whole AVSE now runs ~4.2× faster than real-time on one static bitstream, using *less* BRAM
   than before.**

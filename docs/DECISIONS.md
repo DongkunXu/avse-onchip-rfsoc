@@ -197,8 +197,10 @@ resource×efficiency balance, no shortcut on the computation. Decisions/findings
 - **BLOCKS (TCN core) held** at the BRAM-expensive frontier (II→1 needs complete partition → ~2× BRAM). Long
   syntheses run **detached** (`Start-Process`), per the [[hls-synthesis-and-optimization]] lesson.
 - **RESULT (2026-06-28, on real silicon):** post-route **BRAM 76.8 % (LOWER than the 85.3 % baseline), DSP
-  36.6 %, LUT 32.1 %, 200 MHz met (WNS +0.083 ns)**; on-board **286 ms/window (40.8× vs 11.67 s)**, **4.2×
-  under real-time**; quality identical (SI-SDR 6.662 vs 6.66) at silicon-vs-emulator **corr 0.9855 = baseline**.
+  36.6 %, LUT 32.1 %; timing met at 187.5 MHz (`clk_pl_0` 5.333 ns, WNS +0.083 ns** — the optimized critical
+  path 5.250 ns does not close 200 MHz; tool reports in `hls/reports/`+`hw/reports/`)**; on-board **286 ms/window
+  (40.8× vs 11.67 s)**, **4.2× under real-time** (cycle-exact: 53.7M cyc × 5.333 ns = 286 ms); quality identical
+  (SI-SDR 6.662 vs 6.66) at silicon-vs-emulator **corr 0.9855 = baseline**.
   The optimization spent DSP/LUT/FF and *freed* BRAM — the resource×efficiency contribution demonstrated on
   silicon. **Residual correction:** the small silicon-vs-design residual is pre-existing/unchanged (corr
   identical), NOT the DDR reads as earlier hypothesized — a quality-negligible silicon-vs-C-sim effect, open

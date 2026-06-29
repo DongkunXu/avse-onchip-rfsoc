@@ -82,8 +82,10 @@ on-board measurement → **throughput optimization (40.8× faster on-board, at l
 - **Phase 4 (throughput optimization) — DONE** (DECISIONS D-20; `hls/OPTIMIZATION_PLAN.md`). On-chip
   frame/audio caches, unrolled conv/TCN reductions (channel-partition + register weights), and a **gather
   decoder** replacing the rolled scatter — **all C-sim bit-identical** to Phase 3b. **Post-route: BRAM 76.8 %
-  (↓ from 85.3 %), DSP 36.6 %, LUT 32.1 %, 200 MHz met.** **On-board 286 ms/window — 40.8× vs the 11.67 s
-  baseline → 4.2× under real-time**, quality identical (SI-SDR 6.66, corr 0.9855 = baseline). The optimization
+  (↓ from 85.3 %), DSP 36.6 %, LUT 32.1 %; timing met at 187.5 MHz (`clk_pl_0` 5.333 ns, WNS +0.083 ns** —
+  the longer optimized critical path of 5.250 ns does not close 200 MHz; tool reports in `hw/reports/` +
+  `hls/reports/`). **On-board 286 ms/window — 40.8× vs the 11.67 s baseline → 4.2× under real-time** (the board
+  is cycle-exact: 53.7M cyc × 5.333 ns = 286 ms), quality identical (SI-SDR 6.66, corr 0.9855 = baseline). The optimization
   spent DSP/LUT/FF and *freed* BRAM — the resource×efficiency contribution, on real silicon. The decoder RMW
   hazard is eliminated at the root (gather).
 

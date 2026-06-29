@@ -59,12 +59,13 @@ and got us to bitstream), but the latency justification was wrong. The video is 
 ### Final post-route + on-board (optimized, single static config, real weights)
 | | Baseline (rolled) | **Optimized** |
 |---|---:|---:|
-| Latency csynth | 2.564 s | **0.269 s (9.5×)** |
+| Latency (cycles) | 512.8M | **53.7M (9.5×)** |
+| Latency csynth (@5 ns target) | 2.564 s | 0.269 s |
 | **On-board / window** | **11.67 s** | **0.286 s (40.8×)** |
 | BRAM (post-route) | 85.3 % | **76.8 %** ↓ |
 | DSP | 17 % | 36.6 % |
 | LUT | 19 % | 32.1 % |
-| Timing | 200 MHz met | **200 MHz met** (WNS +0.083 ns) |
+| Timing (post-route) | 200 MHz (CP 4.869 ns) | **187.5 MHz** (`clk_pl_0` 5.333 ns, WNS +0.083 ns) |
 | On-board SI-SDR / PESQ / STOI | 6.66 / 1.72 / 0.72 | **6.66 / 1.72 / 0.72** (identical) |
 
 **On the ~2 % residual (correction):** earlier notes hypothesized the optimization (frame/audio caches) would
@@ -180,8 +181,9 @@ value-faithful). Two directions are deliberately left as future work:
   `int2_csynth.flag`); polling for completion. Export goes to `c7_avse_opt/sol1/impl/ip` for the opt
   bitstream (`hw/rebuild_vivado_opt.bat`).
 - _(2026-06-28)_ **Integrated csynth+export DONE** (detached, 2.52 h, survived a session boundary).
-  **Monolith latency = 53.74M cyc = 0.269 s/window @ 200 MHz — 9.5× vs the 2.564 s baseline, 4.5× under
-  real-time.** (video_encoder 36.25M / audio_core 17.2M / VPROJ+VUP 0.28M.) csynth-est resources: BRAM
+  **Monolith latency = 53.74M cyc — 9.5× vs the 2.564 s (512.8M cyc) baseline** (= 0.269 s/window at the
+  HLS 5 ns/200 MHz target; the implemented bitstream clocks at 187.5 MHz → 0.287 s, see below).
+  (video_encoder 36.25M / audio_core 17.2M / VPROJ+VUP 0.28M.) csynth-est resources: BRAM
   **1687 (78%)**, DSP 1565 (36%), LUT 330k (77% — HLS over-counts pre-route, drops hard at P&R), FF 18%.
   IP exported (`xilinx_com_hls_c7_avse_top_1_0.zip`). **Opt bitstream build RUNNING detached**
   (`rebuild_vivado_opt.bat`: BD → synth → P&R → bitstream → overlay; writes `hw/rebuild_done.flag`).
@@ -189,9 +191,11 @@ value-faithful). Two directions are deliberately left as future work:
 - _(2026-06-28)_ **✅ OPTIMIZED BITSTREAM BUILT + RUN ON BOARD — phase complete.** Post-route (Vivado P&R,
   detached): **BRAM 829/1080 tiles = 76.8 %** (LOWER than baseline 85.3 % — gather decoder dropped the obuf
   scatter accumulator + weights live in registers), **DSP 1563 (36.6 %), LUT 136675 (32.1 %), FF 10.4 %;
-  timing MET @ 200 MHz (WNS +0.083 ns).** Deployed to RFSoC 4x2 (`avse_sys.bit`, baseline backed up):
-  **on-board 286 ms/window (3.49 win/s) — 40.8× vs the baseline 11.67 s** (caches removed the un-bursted-DDR
-  penalty, so it tracks the 0.269 s csynth instead of ballooning 4.5×). **Quality identical:** SI-SDR 6.662 /
+  timing MET at 187.5 MHz (`clk_pl_0` 5.333 ns, WNS +0.083 ns** — the optimized critical path 5.250 ns does
+  not close 200 MHz; tool reports `hls/reports/`+`hw/reports/`).** Deployed to RFSoC 4x2 (`avse_sys.bit`,
+  baseline backed up): **on-board 286 ms/window (3.49 win/s) — 40.8× vs the baseline 11.67 s** (caches removed
+  the un-bursted-DDR penalty, so the board is **cycle-exact**: 53.7M cyc × 5.333 ns = 286 ms, not ballooned).
+  **Quality identical:** SI-SDR 6.662 /
   PESQ 1.721 / STOI 0.716 (baseline 6.66/1.72/0.72), beats mixed +2.27 dB; silicon-vs-emulator **corr 0.9855 =
   baseline** → value-faithful on silicon, residual unchanged (see correction above). **BLOCKS NOT pushed:**
   post-route BRAM is only 76.8 % (23 % headroom) so II→1 on the TCN is feasible (~+64 BRAM, ~1.2× more) — a

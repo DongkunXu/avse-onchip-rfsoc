@@ -19,14 +19,19 @@ frame/audio caches, unrolled conv/TCN reductions via channel-partition + registe
 | **LUT** | **136,675** | 425,280 | **32.1 %** | 19.0 % |
 | FF | 88,734 | 850,560 | 10.4 % | 4.9 % |
 
-**Timing MET — 200 MHz, WNS +0.083 ns.** Latency **0.269 s/window csynth (9.5× vs the 2.564 s rolled
-baseline)**; **on-board 0.286 s/window (3.49 win/s) — 40.8× vs the 11.67 s baseline → 4.2× under real-time.**
+**Timing MET — 187.5 MHz (`clk_pl_0`, 5.333 ns), WNS +0.083 ns** (post-route, `hw/reports/`; the optimized
+critical path is 5.250 ns so it does *not* close 200 MHz — the optimization traded a slightly longer path for
+9.5× fewer cycles). Cycle count **9.5× below the 2.564 s rolled baseline** (512.8M → 53.7M cyc); per-window
+time **0.287 s** at the implemented 187.5 MHz = the measured **on-board 0.286 s/window (3.49 win/s) — 40.8×
+vs the 11.67 s baseline → 4.2× under real-time.** (The HLS csynth *estimate* of 0.269 s assumed its 5 ns /
+200 MHz target clock.)
 
 > **The optimization spent the abundant DSP/LUT/FF and *freed* BRAM** (85.3 % → 76.8 %, the binding
 > resource) — a 40.8× on-board speedup at **lower** BRAM, same single static configuration, timing closed.
 > Quality is **identical on silicon** (SI-SDR 6.662 / PESQ 1.721 / STOI 0.716, vs baseline 6.66/1.72/0.72)
 > and silicon-vs-emulator **corr 0.9855 = baseline** → fully value-faithful, only faster. The on-chip caches
-> removed the un-bursted-DDR penalty (silicon now tracks the csynth estimate). The decoder RMW hazard is
+> removed the un-bursted-DDR penalty, so the board is now **cycle-exact at the implemented clock** (286 ms =
+> 53.7M cyc × 5.333 ns @ 187.5 MHz), not ballooned. The decoder RMW hazard is
 > eliminated at the root (gather, not scatter). ~23 % BRAM headroom remains (BLOCKS II→1 is an optional
 > further ~1.2×). This is the resource×efficiency contribution, demonstrated on real hardware.
 
