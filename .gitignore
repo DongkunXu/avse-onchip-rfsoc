@@ -61,8 +61,10 @@ hw/**/*.cache/
 hw/vivado_proj/
 hw/overlay/
 hw/board/board_*.npz
-# stratified SNR-bin eval working data (regenerable: prep_board_snr_bins.py + run_board_chunks.sh + score)
-hw/board/snr_eval/
+# stratified SNR-bin eval working data (regenerable) — but KEEP the small result figures + aggregated JSON
+hw/board/snr_eval/*
+!hw/board/snr_eval/*.png
+!hw/board/snr_eval/*_results.json
 hw/board/snr_smoke/
 # on-chip visual-ablation working data (regenerable: prep_board_novideo_chunks.py + run_board_chunks.sh)
 hw/board/snr_eval_novideo/
@@ -80,3 +82,11 @@ scratch/
 Thumbs.db
 .vscode/
 .idea/
+
+# ── Tracked exceptions (meaningful artifacts kept despite the broad ignores above) ───────
+# The deployable artifact chain: trained model -> exported int16 deploy weights -> generated HLS
+# weight ROM (so hls/ is directly synthesizable). The 34 MB bitstream itself stays excluded; these
+# all regenerate from best.pt but are small + central, so we snapshot them in the repo.
+!experiments/p2-c7-full/best.pt
+!experiments/p2-c7-full/deploy_weights.npz
+!hls/src/c7_weights.hpp
