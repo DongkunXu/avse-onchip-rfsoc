@@ -176,26 +176,18 @@ at very low SNR even AV is hard. **The model is genuinely audio-visual, and that
 + the silicon datapath.** Plots: `hw/board/snr_eval/{video_ablation,board_video_ablation,video_ablation_combined}.png`.
 Full per-bin JSON: `video_ablation_results.json` (FP32), `board_video_ablation_results.json` (FPGA).
 
-### Power / energy / efficiency — FPGA vs GPU vs CPU (2026-06-30)
+### Power / energy / efficiency — measured (2026-06-30)
 
-Measured inference power/energy of the deployed AVSE: **FPGA RFSoC 4x2 (int16, on-board INA220 rails)** vs the
-same model FP32 on **GPU RTX 5070 Ti (NVML)** and **CPU i5-14600KF (estimate)**. One inference = one 1.2 s
-window. Full writeup + figure: [`power_efficiency/README.md`](power_efficiency/). Tools: `bench_inference.py`,
-`hw/board/bench_fpga_power.py`, `summarize_efficiency.py`.
+Inference of the deployed AVSE, one 1.2 s window. FPGA power = whole board (INA220), GPU power = card (NVML),
+CPU power not measured. Writeup + figure + raw JSON: [`power_efficiency/`](power_efficiency/). Tools:
+`bench_inference.py`, `hw/board/bench_fpga_power.py`, `summarize_efficiency.py`.
 
-| platform | prec | latency/win | ×real-time | power | energy/win | perf/W |
-|---|---|--:|--:|--:|--:|--:|
-| **FPGA RFSoC 4x2** | int16 | 286 ms | 4.2× | **6.6 W** (meas; idle 5.9, dyn +0.73) | 1.90 J | 0.53 |
-| GPU 5070 Ti b1 | fp32 | 2.94 ms | 408× | 75.8 W (meas) | 0.22 J | 4.49 |
-| GPU 5070 Ti b64 | fp32 | 0.62 ms | 1941× | 209 W (meas) | 0.13 J | 7.72 |
-| CPU i5-14600KF b1 | fp32 | 17.1 ms | 70× | ~70 W* | ~1.20 J* | 0.84 |
-
-**Honest verdict (mixed):** run flat-out the **GPU wins** throughput (100–460×) and energy-per-inference
-(~9–15×) — the model is tiny and the FPGA was built for *fit*, not peak speed. The FPGA wins **absolute power**
-(6.6 W vs 76–209 W) and, for the **actual deployment (one always-on real-time stream)**, is **~12–14× more
-energy-efficient** (6.1 vs 71–84 J per audio-second) because a GPU/CPU+host idle at ~70–84 W with their speed
-wasted on one stream. It's also a complete standalone chip. (\*CPU power + host-idle are estimates; FPGA/GPU
-measured. FP32 GPU/CPU vs int16 FPGA = as-deployed paths.)
+| platform | prec | batch | latency/win | throughput | ×real-time | power | energy/win | perf/W |
+|---|---|--:|--:|--:|--:|--:|--:|--:|
+| FPGA RFSoC 4x2 | int16 | 1 | 286.2 ms | 3.49 win/s | 4.2× | 6.63 W (idle 5.90, dyn +0.73) | 1.90 J | 0.53 |
+| GPU RTX 5070 Ti | fp32 | 1 | 2.94 ms | 340.4 win/s | 408.5× | 75.8 W | 0.22 J | 4.49 |
+| GPU RTX 5070 Ti | fp32 | 64 | 0.62 ms | 1617.3 win/s | 1940.8× | 209.4 W | 0.13 J | 7.72 |
+| CPU i5-14600KF | fp32 | 1 | 17.08 ms | 58.5 win/s | 70.2× | — | — | — |
 
 ## Reference anchors (for comparison, not experiments)
 

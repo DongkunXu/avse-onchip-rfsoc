@@ -1,4 +1,5 @@
 {
+  "audio_s_per_window": 1.2,
   "rows": [
     {
       "label": "FPGA RFSoC 4x2",
@@ -7,13 +8,23 @@
       "thr": 3.4944772257151837,
       "rt": 4.193372670858221,
       "power_w": 6.628416666666667,
-      "power_measured": true,
       "e_win_j": 1.8968264030709452,
       "e_audio_j": 1.5806886692257878,
       "perf_per_w": 0.5271963730476383,
       "idle_w": 5.898750000000001,
+      "active_w": 6.628416666666667,
       "dyn_w": 0.7296666666666667,
-      "is_cpu": false,
+      "per_rail_w": {
+        "hwmon0": 4.0,
+        "hwmon1": 1.4008333333333332,
+        "hwmon2": 1.0708333333333333,
+        "hwmon3": 0.0,
+        "hwmon4": 0.03925,
+        "hwmon5": 0.06,
+        "hwmon6": 0.0,
+        "hwmon7": 0.03991666666666666,
+        "hwmon8": 0.017583333333333333
+      },
       "is_fpga": true
     },
     {
@@ -23,13 +34,13 @@
       "thr": 340.39223778809026,
       "rt": 408.47068534570826,
       "power_w": 75.80915492957749,
-      "power_measured": true,
       "e_win_j": 0.2227111740919667,
       "e_audio_j": 0.18559264507663892,
       "perf_per_w": 4.4901204624203475,
       "idle_w": null,
+      "active_w": 75.80915492957749,
       "dyn_w": null,
-      "is_cpu": false,
+      "per_rail_w": null,
       "is_fpga": false
     },
     {
@@ -39,13 +50,13 @@
       "thr": 1617.3021408976263,
       "rt": 1940.7625690771515,
       "power_w": 209.3666666666667,
-      "power_measured": true,
       "e_win_j": 0.12945426916362401,
       "e_audio_j": 0.10787855763635334,
       "perf_per_w": 7.724735587793151,
       "idle_w": null,
+      "active_w": 209.3666666666667,
       "dyn_w": null,
-      "is_cpu": false,
+      "per_rail_w": null,
       "is_fpga": false
     },
     {
@@ -54,18 +65,15 @@
       "lat_ms": 17.08228166680783,
       "thr": 58.54018915652678,
       "rt": 70.24822698783214,
-      "power_w": 70.0,
-      "power_measured": false,
-      "e_win_j": 1.1957597166765481,
-      "e_audio_j": 0.9964664305637901,
-      "perf_per_w": 0.8362884165218111,
+      "power_w": null,
+      "e_win_j": null,
+      "e_audio_j": null,
+      "perf_per_w": null,
       "idle_w": null,
+      "active_w": null,
       "dyn_w": null,
-      "is_cpu": true,
+      "per_rail_w": null,
       "is_fpga": false
     }
-  ],
-  "audio_s": 1.2,
-  "cpu_power_est_w": 70.0,
-  "host_idle_est_w": 70.0
+  ]
 }
