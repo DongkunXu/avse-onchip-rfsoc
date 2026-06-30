@@ -1,0 +1,71 @@
+{
+  "rows": [
+    {
+      "label": "FPGA RFSoC 4x2",
+      "prec": "int16",
+      "lat_ms": 286.1658369501432,
+      "thr": 3.4944772257151837,
+      "rt": 4.193372670858221,
+      "power_w": 6.628416666666667,
+      "power_measured": true,
+      "e_win_j": 1.8968264030709452,
+      "e_audio_j": 1.5806886692257878,
+      "perf_per_w": 0.5271963730476383,
+      "idle_w": 5.898750000000001,
+      "dyn_w": 0.7296666666666667,
+      "is_cpu": false,
+      "is_fpga": true
+    },
+    {
+      "label": "GPU RTX 5070 Ti (b1)",
+      "prec": "fp32",
+      "lat_ms": 2.937787319999188,
+      "thr": 340.39223778809026,
+      "rt": 408.47068534570826,
+      "power_w": 75.80915492957749,
+      "power_measured": true,
+      "e_win_j": 0.2227111740919667,
+      "e_audio_j": 0.18559264507663892,
+      "perf_per_w": 4.4901204624203475,
+      "idle_w": null,
+      "dyn_w": null,
+      "is_cpu": false,
+      "is_fpga": false
+    },
+    {
+      "label": "GPU RTX 5070 Ti (b64)",
+      "prec": "fp32",
+      "lat_ms": 0.6183136562503933,
+      "thr": 1617.3021408976263,
+      "rt": 1940.7625690771515,
+      "power_w": 209.3666666666667,
+      "power_measured": true,
+      "e_win_j": 0.12945426916362401,
+      "e_audio_j": 0.10787855763635334,
+      "perf_per_w": 7.724735587793151,
+      "idle_w": null,
+      "dyn_w": null,
+      "is_cpu": false,
+      "is_fpga": false
+    },
+    {
+      "label": "CPU i5-14600KF (b1)",
+      "prec": "fp32",
+      "lat_ms": 17.08228166680783,
+      "thr": 58.54018915652678,
+      "rt": 70.24822698783214,
+      "power_w": 70.0,
+      "power_measured": false,
+      "e_win_j": 1.1957597166765481,
+      "e_audio_j": 0.9964664305637901,
+      "perf_per_w": 0.8362884165218111,
+      "idle_w": null,
+      "dyn_w": null,
+      "is_cpu": true,
+      "is_fpga": false
+    }
+  ],
+  "audio_s": 1.2,
+  "cpu_power_est_w": 70.0,
+  "host_idle_est_w": 70.0
+}

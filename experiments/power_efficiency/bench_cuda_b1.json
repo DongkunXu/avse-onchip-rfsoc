@@ -1,0 +1,24 @@
+{
+  "platform": "cuda",
+  "device_name": "NVIDIA GeForce RTX 5070 Ti",
+  "precision": "fp32",
+  "batch": 1,
+  "iters": 2500,
+  "warmup": 200,
+  "cpu_threads": null,
+  "latency_ms_per_window": 2.937787319999188,
+  "throughput_win_per_s": 340.39223778809026,
+  "realtime_factor": 408.47068534570826,
+  "audio_s_per_window": 1.2,
+  "power_w": 75.80915492957749,
+  "power_stats": {
+    "power_w_mean": 75.80915492957749,
+    "power_w_max": 78.78,
+    "power_w_p50": 77.73,
+    "n_samples": 71,
+    "sm_clock_mhz_mean": 2842.0
+  },
+  "energy_j_per_window": 0.2227111740919667,
+  "energy_j_per_audio_s": 0.18559264507663892,
+  "windows_per_joule": 4.4901204624203475
+}

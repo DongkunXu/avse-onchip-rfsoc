@@ -1,0 +1,16 @@
+{
+  "platform": "cpu",
+  "device_name": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "precision": "fp32",
+  "batch": 1,
+  "iters": 60,
+  "warmup": 10,
+  "cpu_threads": 14,
+  "latency_ms_per_window": 17.08228166680783,
+  "throughput_win_per_s": 58.54018915652678,
+  "realtime_factor": 70.24822698783214,
+  "audio_s_per_window": 1.2,
+  "power_w": null,
+  "power_stats": null,
+  "energy_j_per_window": null
+}

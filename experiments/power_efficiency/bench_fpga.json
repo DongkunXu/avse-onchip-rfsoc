@@ -1,0 +1,31 @@
+{
+  "platform": "fpga",
+  "device": "RFSoC 4x2 (xczu48dr) optimized bitstream",
+  "precision": "int16",
+  "clock_mhz": 187.5,
+  "n_inferences": 480,
+  "latency_ms_per_window": 286.1658369501432,
+  "throughput_win_per_s": 3.4944772257151837,
+  "realtime_factor": 4.193372670858221,
+  "audio_s_per_window": 1.2,
+  "idle_power_w": 5.898750000000001,
+  "power_w": 6.628416666666667,
+  "active_power_w_max": 7.14,
+  "dynamic_power_w": 0.7296666666666667,
+  "per_rail_active_w": {
+    "hwmon0": 4.0,
+    "hwmon1": 1.4008333333333332,
+    "hwmon2": 1.0708333333333333,
+    "hwmon3": 0.0,
+    "hwmon4": 0.03925,
+    "hwmon5": 0.06,
+    "hwmon6": 0.0,
+    "hwmon7": 0.03991666666666666,
+    "hwmon8": 0.017583333333333333
+  },
+  "n_power_samples": 480,
+  "energy_j_per_window": 1.8968264030709452,
+  "energy_j_per_audio_s": 1.5806886692257878,
+  "windows_per_joule": 0.5271963730476383,
+  "dynamic_energy_j_per_window": 0.20880567236128783
+}
